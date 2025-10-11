@@ -1,25 +1,25 @@
-name: Build and Release Covenantrix
+name: Build and Release
 
 on:
   push:
-    tags: ['v*']
-  pull_request:
-    branches: [main]
+    tags:
+      - 'v*'
   workflow_dispatch:
     inputs:
-      create_release:
-        description: 'Create GitHub release'
-        required: false
-        default: false
-        type: boolean
+      version:
+        description: 'Release version (e.g., 1.0.0)'
+        required: true
+        type: string
 
-permissions:
-  contents: write
-  actions: read
-  checks: write
+env:
+  PYTHON_VERSION: '3.11'
+  NODE_VERSION: '20'
 
 jobs:
   build:
+    name: Build ${{ matrix.platform }}
+    runs-on: ${{ matrix.os }}
+    
     strategy:
       fail-fast: false
       matrix:
@@ -27,451 +27,240 @@ jobs:
           - os: windows-latest
             platform: win
             arch: x64
-            python_url: https://www.python.org/ftp/python/3.11.6/python-3.11.6-embed-amd64.zip
-            python_exe: python.exe
-            artifact_pattern: "*.exe"
           - os: macos-latest
             platform: mac
+            arch: universal
+          - os: ubuntu-latest
+            platform: linux
             arch: x64
-            python_exe: bin/python
-            artifact_pattern: "*.dmg"
-            
-    runs-on: ${{ matrix.os }}
-    
+
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-      
-    - name: Setup Node.js
-      uses: actions/setup-node@v4
-      with:
-        node-version: '20'
-        cache: 'npm'
-        cache-dependency-path: 'covenantrix-desktop/package-lock.json'
-        
-    - name: Setup Python
-      uses: actions/setup-python@v5
-      with:
-        python-version: '3.11'
-        
-    - name: Install Node dependencies
-      working-directory: covenantrix-desktop
-      run: npm ci
-      
-    - name: Create Python Distribution (Windows)
-      if: matrix.os == 'windows-latest'
-      shell: bash
-      run: |
-        set -e
-        
-        echo "=========================================="
-        echo "Creating Windows Python Distribution"
-        echo "=========================================="
-        mkdir -p dist/python-dist
-        
-        echo "Downloading Python embed..."
-        curl -L -o python-embed.zip ${{ matrix.python_url }} || exit 1
-        
-        echo "Extracting Python embed..."
-        unzip -q python-embed.zip -d dist/python-dist/ || exit 1
-        
-        if [ ! -f "dist/python-dist/python.exe" ]; then
-          echo "Python executable not found after extraction"
-          ls -la dist/python-dist/
-          exit 1
-        fi
-        echo "Python extracted successfully"
-        
-        echo "Configuring Python environment..."
-        echo "import sys; import os; sys.path.append(os.path.join(os.path.dirname(__file__), 'Lib', 'site-packages'))" > dist/python-dist/sitecustomize.py
-        
-        # Configure python311._pth with all necessary paths
-        echo "python311.zip" > dist/python-dist/python311._pth
-        echo "." >> dist/python-dist/python311._pth
-        echo "./Lib" >> dist/python-dist/python311._pth
-        echo "./Lib/site-packages" >> dist/python-dist/python311._pth
-        echo "import site" >> dist/python-dist/python311._pth
-        
-        mkdir -p dist/python-dist/Lib/site-packages
-        
-        echo "Downloading get-pip.py..."
-        curl -L https://bootstrap.pypa.io/get-pip.py -o get-pip.py || exit 1
-        
-        echo "Installing pip..."
-        dist/python-dist/python.exe get-pip.py --target dist/python-dist/Lib/site-packages --no-warn-script-location || exit 1
-        
-        echo "Testing pip installation..."
-        dist/python-dist/python.exe -c "import pip; print('Pip version:', pip.__version__)" || exit 1
-        echo "Pip installed successfully"
-        
-        echo "Installing required packages from requirements.txt..."
-        dist/python-dist/python.exe -m pip install --target dist/python-dist/Lib/site-packages --no-warn-script-location -r backend/requirements.txt || exit 1
-        
-        echo "Windows Python distribution created successfully"
-        
-    - name: Create Python Distribution (macOS)
-      if: matrix.os == 'macos-latest'
-      run: |
-        echo "=========================================="
-        echo "Creating macOS Python Distribution"
-        echo "=========================================="
-        
-        # Create distribution directory
-        mkdir -p dist/python-dist
-        
-        # Download Python standalone build
-        # Detect architecture (GitHub Actions macOS runners are x86_64)
-        ARCH=$(uname -m)
-        if [ "$ARCH" = "arm64" ] || [ "$ARCH" = "aarch64" ]; then
-          PYTHON_ARCH="aarch64"
-        else
-          PYTHON_ARCH="x86_64"
-        fi
-        
-        echo "Downloading Python standalone build for macOS (${PYTHON_ARCH})..."
-        curl -L -o python-macos.tar.gz "https://github.com/indygreg/python-build-standalone/releases/download/20231002/cpython-3.11.6+20231002-${PYTHON_ARCH}-apple-darwin-install_only.tar.gz" || exit 1
-        
-        echo "Extracting Python..."
-        tar -xzf python-macos.tar.gz -C dist/python-dist --strip-components=1 || exit 1
-        
-        echo "Extracted contents:"
-        ls -la dist/python-dist/
-        
-        # Verify Python executable
-        if [ ! -f "dist/python-dist/bin/python3" ]; then
-          echo "CRITICAL ERROR: Python executable not found after extraction"
-          exit 1
-        fi
-        
-        # Create symlink for convenience
-        ln -sf python3 dist/python-dist/bin/python
-        echo "Created python symlink"
-        
-        echo "Installing pip..."
-        curl -L https://bootstrap.pypa.io/get-pip.py -o get-pip.py || exit 1
-        dist/python-dist/bin/python3 get-pip.py || exit 1
-        
-        echo "Installing required packages..."
-        dist/python-dist/bin/python3 -m pip install -r backend/requirements.txt || exit 1
-        
-        echo "macOS Python distribution created successfully"
-        
-    - name: Verify Python Distribution
-      shell: bash
-      run: |
-        echo "=========================================="
-        echo "Verifying Python Distribution"
-        echo "=========================================="
-        
-        if [ "${{ matrix.os }}" == "windows-latest" ]; then
-          echo "Platform: Windows"
-          
-          if [ ! -f "dist/python-dist/python.exe" ]; then
-            echo "CRITICAL ERROR: Windows Python executable not found!"
-            exit 1
-          fi
-          
-          echo "Python version:"
-          dist/python-dist/python.exe --version || exit 1
-          
-          echo "Testing core package imports:"
-          dist/python-dist/python.exe -c "import fastapi; print('  FastAPI:', fastapi.__version__)" || exit 1
-          dist/python-dist/python.exe -c "import uvicorn; print('  Uvicorn: OK')" || exit 1
-          dist/python-dist/python.exe -c "import pydantic; print('  Pydantic:', pydantic.__version__)" || exit 1
-          
-          echo "Testing HTTP/async dependencies:"
-          dist/python-dist/python.exe -c "import aiohttp; print('  aiohttp:', aiohttp.__version__)" || exit 1
-          dist/python-dist/python.exe -c "import httpx; print('  httpx: OK')" || exit 1
-          dist/python-dist/python.exe -c "import aiofiles; print('  aiofiles: OK')" || exit 1
-          
-          echo "Testing AI/RAG dependencies:"
-          dist/python-dist/python.exe -c "import openai; print('  OpenAI: OK')" || exit 1
-          dist/python-dist/python.exe -c "import lightrag; print('  LightRAG: OK')" 2>/dev/null || echo "  LightRAG not installed (optional)"
-          
-          echo "Testing document processing:"
-          dist/python-dist/python.exe -c "import PyPDF2; print('  PyPDF2: OK')" 2>/dev/null || echo "  PyPDF2: optional"
-          dist/python-dist/python.exe -c "import docx; print('  python-docx: OK')" 2>/dev/null || echo "  python-docx: optional"
-          dist/python-dist/python.exe -c "import openpyxl; print('  openpyxl: OK')" 2>/dev/null || echo "  openpyxl: optional"
-          
-          DIST_SIZE=$(du -sb dist/python-dist | cut -f1)
-          MIN_SIZE=50000000
-          if [ "$DIST_SIZE" -lt "$MIN_SIZE" ]; then
-            echo "CRITICAL ERROR: Python distribution too small"
-            ls -la dist/python-dist/
-            exit 1
-          fi
-          echo "Windows Python distribution validated: $(($DIST_SIZE / 1024 / 1024))MB"
-          
-        else
-          echo "Platform: macOS"
-          
-          if [ ! -f "dist/python-dist/bin/python" ]; then
-            echo "CRITICAL ERROR: macOS Python executable not found!"
-            exit 1
-          fi
-          
-          echo "Python version:"
-          dist/python-dist/bin/python --version || exit 1
-          
-          echo "Testing core packages:"
-          dist/python-dist/bin/python -c "import fastapi, uvicorn, pydantic; print('  Core packages: OK')" || exit 1
-          
-          echo "Testing HTTP/async dependencies:"
-          dist/python-dist/bin/python -c "import aiohttp, httpx, aiofiles; print('  HTTP/async packages: OK')" || exit 1
-          
-          echo "Testing AI/RAG dependencies:"
-          dist/python-dist/bin/python -c "import openai; print('  OpenAI: OK')" || exit 1
-          dist/python-dist/bin/python -c "import lightrag; print('  LightRAG: OK')" 2>/dev/null || echo "  LightRAG not installed (optional)"
-          
-          echo "Testing document processing:"
-          dist/python-dist/bin/python -c "import PyPDF2, docx, openpyxl; print('  Document processing: OK')" 2>/dev/null || echo "  Some document packages missing (optional)"
-          
-          echo "macOS Python distribution validated"
-        fi
-        
-        echo "=========================================="
-        echo "Python distribution verification completed"
-        echo "=========================================="
-        
-    - name: Test Backend Startup
-      shell: bash
-      run: |
-        echo "=========================================="
-        echo "Testing Backend Startup"
-        echo "=========================================="
-        
-        # Change to backend directory (matches production backend-manager.js line 59)
-        cd backend
-        
-        if [ "${{ matrix.os }}" == "windows-latest" ]; then
-          # Windows: Run Python from dist with main.py
-          ../dist/python-dist/python.exe main.py &
-        else
-          # macOS: Run Python from dist with main.py
-          ../dist/python-dist/bin/python main.py &
-        fi
-        
-        BACKEND_PID=$!
-        echo "Backend started with PID: $BACKEND_PID"
-        
-        echo "Waiting for backend to start (max 30 seconds)..."
-        for i in {1..30}; do
-          if curl -s http://127.0.0.1:8000/health > /dev/null 2>&1; then
-            echo "Backend is responding!"
-            break
-          fi
-          if [ $i -eq 30 ]; then
-            echo "Backend failed to start within 30 seconds"
-            echo "Checking for backend process..."
-            ps aux | grep python || true
-            echo "Last few lines of backend output (if any):"
-            kill -0 $BACKEND_PID 2>/dev/null && echo "Backend process still running" || echo "Backend process died"
-            kill $BACKEND_PID 2>/dev/null || true
-            exit 1
-          fi
-          echo "  Attempt $i/30: waiting..."
-          sleep 1
-        done
-        
-        echo "Testing health endpoint:"
-        HEALTH_RESPONSE=$(curl -s http://127.0.0.1:8000/health)
-        echo "  Response: $HEALTH_RESPONSE"
-        
-        echo "Testing API docs endpoint:"
-        HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:8000/docs)
-        if [ "$HTTP_CODE" -eq "200" ]; then
-          echo "  API docs endpoint: HTTP $HTTP_CODE"
-        else
-          echo "  API docs returned HTTP $HTTP_CODE (non-critical)"
-        fi
-        
-        echo "Stopping backend..."
-        kill $BACKEND_PID 2>/dev/null || true
-        sleep 2
-        
-        # Return to repo root for subsequent steps
-        cd ..
-        
-        echo "Backend test completed successfully"
-        echo "=========================================="
-        
-    - name: Build Electron App
-      working-directory: covenantrix-desktop
-      run: |
-        echo "=========================================="
-        echo "Building Electron App for ${{ matrix.platform }}"
-        echo "=========================================="
-        npm run package:${{ matrix.platform }}
-      env:
-        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        
-    - name: Verify Packaged App Structure
-      shell: bash
-      run: |
-        echo "=========================================="
-        echo "Verifying Packaged App Structure"
-        echo "=========================================="
-        
-        if [ "${{ matrix.os }}" == "windows-latest" ]; then
-          echo "Verifying Windows app structure..."
-          
-          # Check unpacked directory
-          if [ -d "covenantrix-desktop/dist/release/win-unpacked" ]; then
-            echo "Found unpacked Windows app directory"
-            ls -la covenantrix-desktop/dist/release/win-unpacked/resources/
-            
-            # Verify backend and python-dist are packaged
-            if [ ! -d "covenantrix-desktop/dist/release/win-unpacked/resources/backend" ]; then
-              echo "ERROR: Backend directory not found in packaged app"
-              exit 1
-            fi
-            
-            if [ ! -d "covenantrix-desktop/dist/release/win-unpacked/resources/python-dist" ]; then
-              echo "ERROR: Python distribution not found in packaged app"
-              exit 1
-            fi
-            
-            echo "✓ Backend and Python distribution correctly packaged"
+      # ============================================
+      # 1. CHECKOUT AND SETUP
+      # ============================================
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: covenantrix-desktop/package-lock.json
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'pip'
+          cache-dependency-path: backend/requirements.txt
+
+      # ============================================
+      # 2. BUILD PYTHON BACKEND WITH PYINSTALLER
+      # ============================================
+      - name: Install Python dependencies
+        working-directory: backend
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pyinstaller
+
+      - name: Build Backend Executable
+        working-directory: backend
+        run: |
+          pyinstaller \
+            --name backend \
+            --onefile \
+            --clean \
+            --noconfirm \
+            --log-level WARN \
+            --strip \
+            --noupx \
+            --exclude-module pytest \
+            --exclude-module IPython \
+            --exclude-module matplotlib \
+            --exclude-module notebook \
+            --hidden-import=fastapi \
+            --hidden-import=uvicorn \
+            --hidden-import=pydantic \
+            --collect-all lightrag \
+            main.py
+
+      - name: Verify Backend Build
+        working-directory: backend/dist
+        shell: bash
+        run: |
+          ls -lh
+          if [ "${{ matrix.platform }}" = "win" ]; then
+            ./backend.exe --version || echo "Backend built successfully"
           else
-            echo "Note: Unpacked directory not found (packed into installer)"
+            chmod +x backend
+            ./backend --version || echo "Backend built successfully"
           fi
+
+      # ============================================
+      # 3. PREPARE BACKEND FOR ELECTRON PACKAGING
+      # ============================================
+      - name: Copy Backend to Electron Resources
+        shell: bash
+        run: |
+          mkdir -p covenantrix-desktop/resources/backend
+          if [ "${{ matrix.platform }}" = "win" ]; then
+            cp backend/dist/backend.exe covenantrix-desktop/resources/backend/
+          else
+            cp backend/dist/backend covenantrix-desktop/resources/backend/
+            chmod +x covenantrix-desktop/resources/backend/backend
+          fi
+
+      # ============================================
+      # 4. BUILD ELECTRON APP
+      # ============================================
+      - name: Install Frontend Dependencies
+        working-directory: covenantrix-desktop
+        run: npm ci
+
+      - name: Build React Frontend
+        working-directory: covenantrix-desktop
+        run: npm run build
+        env:
+          NODE_ENV: production
+
+      - name: Package Electron App
+        working-directory: covenantrix-desktop
+        run: |
+          if [ "${{ matrix.platform }}" = "win" ]; then
+            npm run package:win
+          elif [ "${{ matrix.platform }}" = "mac" ]; then
+            npm run package:mac
+          else
+            npm run package:linux
+          fi
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # ============================================
+      # 5. VERIFY BUILD SIZE AND STRUCTURE
+      # ============================================
+      - name: Check Build Size
+        working-directory: covenantrix-desktop/dist
+        shell: bash
+        run: |
+          echo "=== Build Size Report ==="
+          du -sh * | sort -h
           
-        else
-          echo "Verifying macOS app structure..."
-          
-          # For macOS, the resources are inside the .app bundle in the DMG
-          # Verify DMG exists and has reasonable size
-          if ls covenantrix-desktop/dist/release/*.dmg 1> /dev/null 2>&1; then
-            DMG_SIZE=$(du -m covenantrix-desktop/dist/release/*.dmg | cut -f1)
-            echo "DMG size: ${DMG_SIZE}MB"
-            
-            # DMG should be at least 100MB with Python + backend
-            if [ "$DMG_SIZE" -lt 100 ]; then
-              echo "WARNING: DMG seems too small, may be missing components"
-            else
-              echo "✓ DMG size looks reasonable"
+          # Find installer size
+          if [ "${{ matrix.platform }}" = "win" ]; then
+            SIZE=$(du -sm *.exe | cut -f1)
+            echo "Windows installer size: ${SIZE}MB"
+            if [ "$SIZE" -gt 200 ]; then
+              echo "WARNING: Build size exceeds 200MB!"
+            fi
+          elif [ "${{ matrix.platform }}" = "mac" ]; then
+            SIZE=$(du -sm *.dmg | cut -f1)
+            echo "macOS installer size: ${SIZE}MB"
+            if [ "$SIZE" -gt 250 ]; then
+              echo "WARNING: Build size exceeds 250MB!"
             fi
           else
-            echo "WARNING: No DMG file found"
+            SIZE=$(du -sm *.AppImage | cut -f1)
+            echo "Linux installer size: ${SIZE}MB"
+            if [ "$SIZE" -gt 200 ]; then
+              echo "WARNING: Build size exceeds 200MB!"
+            fi
           fi
-        fi
-        
-        echo "=========================================="
-        
-    - name: List Build Output
-      shell: bash
-      run: |
-        echo "=========================================="
-        echo "Build Output"
-        echo "=========================================="
-        echo "Release directory contents:"
-        ls -lah covenantrix-desktop/dist/release/ 2>/dev/null || echo "No release directory found"
-        echo ""
-        echo "Build artifacts:"
-        find covenantrix-desktop/dist/release/ -type f \( -name "*.exe" -o -name "*.dmg" -o -name "*.AppImage" -o -name "*.yml" \) 2>/dev/null || echo "No artifacts found"
-        echo "=========================================="
-        
-    - name: Verify Artifacts Before Upload
-      shell: bash
-      run: |
-        echo "=========================================="
-        echo "Verifying Build Artifacts"
-        echo "=========================================="
-        
-        echo "Checking for build artifacts in dist/release/..."
-        ls -la covenantrix-desktop/dist/release/
-        
-        if [ "${{ matrix.os }}" == "windows-latest" ]; then
-          echo "Looking for Windows installer (.exe)..."
-          if ! ls covenantrix-desktop/dist/release/*.exe 1> /dev/null 2>&1; then
-            echo "ERROR: No Windows installer (.exe) found"
-            exit 1
-          fi
-          echo "✓ Windows installer found"
-          
-        elif [ "${{ matrix.os }}" == "macos-latest" ]; then
-          echo "Looking for macOS installer (.dmg)..."
-          if ! ls covenantrix-desktop/dist/release/*.dmg 1> /dev/null 2>&1; then
-            echo "ERROR: No macOS installer (.dmg) found"
-            exit 1
-          fi
-          echo "✓ macOS installer found"
-        fi
-        
-        echo "Checking for update metadata files..."
-        ls -la covenantrix-desktop/dist/release/latest*.yml 2>/dev/null || echo "Note: No update metadata files found (may be generated separately)"
-        
-        echo "=========================================="
-        
-    - name: Upload Build Artifacts
-      uses: actions/upload-artifact@v4
-      with:
-        name: covenantrix-${{ matrix.platform }}-${{ matrix.arch }}
-        path: |
-          covenantrix-desktop/dist/release/*.exe
-          covenantrix-desktop/dist/release/*.dmg  
-          covenantrix-desktop/dist/release/*.AppImage
-          covenantrix-desktop/dist/release/latest*.yml
-        retention-days: 30
-        if-no-files-found: error
-        
+
+      # ============================================
+      # 6. UPLOAD ARTIFACTS
+      # ============================================
+      - name: Upload Build Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.platform }}-installer
+          path: |
+            covenantrix-desktop/dist/*.exe
+            covenantrix-desktop/dist/*.dmg
+            covenantrix-desktop/dist/*.AppImage
+            covenantrix-desktop/dist/*.yml
+          if-no-files-found: error
+          retention-days: 30
+
+  # ============================================
+  # CREATE GITHUB RELEASE
+  # ============================================
   release:
+    name: Create GitHub Release
     needs: build
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/v')
     
-    permissions:
-      contents: write
-      actions: read
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: dist-artifacts
+
+      - name: Prepare release files
+        run: |
+          mkdir -p release-files
+          find dist-artifacts -type f \( -name "*.exe" -o -name "*.dmg" -o -name "*.AppImage" -o -name "*.yml" \) -exec cp {} release-files/ \;
+          ls -lh release-files/
+
+      - name: Generate release notes
+        id: release_notes
+        run: |
+          VERSION=${GITHUB_REF#refs/tags/v}
+          cat > release_notes.md << EOF
+          ## Covenantrix Desktop v${VERSION}
+          
+          ### Installation
+          
+          **Windows**: Download and run \`Covenantrix-Setup-${VERSION}.exe\`
+          **macOS**: Download, mount \`Covenantrix-${VERSION}.dmg\`, and drag to Applications
+          **Linux**: Download \`Covenantrix-${VERSION}.AppImage\`, make executable, and run
+          
+          ### Auto-Updates
+          The application will automatically check for updates and notify you when a new version is available.
+          
+          ### Changelog
+          - See commit history for detailed changes
+          
+          ### Requirements
+          - No Python installation required (backend is bundled)
+          - Windows: Windows 10 or later
+          - macOS: macOS 10.15 (Catalina) or later
+          - Linux: Ubuntu 20.04 or later, or equivalent
+          EOF
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: release-files/*
+          body_path: release_notes.md
+          draft: false
+          prerelease: false
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # ============================================
+  # NOTIFICATION (Optional)
+  # ============================================
+  notify:
+    name: Send Notification
+    needs: [build, release]
+    runs-on: ubuntu-latest
+    if: always()
     
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-      
-    - name: Download All Artifacts
-      uses: actions/download-artifact@v4
-      with:
-        path: artifacts/
-        
-    - name: Display Artifact Structure
-      run: |
-        echo "=========================================="
-        echo "Downloaded Artifacts"
-        echo "=========================================="
-        find artifacts/ -type f 2>/dev/null || echo "No artifacts found"
-        echo ""
-        echo "Artifact details:"
-        ls -lah artifacts/*/ 2>/dev/null || echo "No artifacts"
-        echo "=========================================="
-        
-    - name: Prepare Release Files
-      run: |
-        echo "Preparing release files..."
-        mkdir -p release-files
-        
-        # Copy all installers (use *.exe to catch all Windows installers)
-        find artifacts/ -name "*.exe" -type f -exec cp {} release-files/ \; 2>/dev/null || echo "No .exe installers found"
-        find artifacts/ -name "*.dmg" -exec cp {} release-files/ \; 2>/dev/null || echo "No .dmg files found"
-        find artifacts/ -name "*.AppImage" -exec cp {} release-files/ \; 2>/dev/null || echo "No .AppImage files found"
-        find artifacts/ -name "latest*.yml" -exec cp {} release-files/ \; 2>/dev/null || echo "No metadata files found"
-        
-        echo ""
-        echo "Verifying update metadata files..."
-        ls -la release-files/latest*.yml 2>/dev/null || echo "WARNING: No update metadata files found"
-        
-        echo ""
-        echo "Release files prepared:"
-        ls -lah release-files/ 2>/dev/null || echo "No release files prepared"
-        
-    - name: Create GitHub Release
-      uses: softprops/action-gh-release@v2
-      with:
-        tag_name: ${{ github.ref_name }}
-        name: Covenantrix ${{ github.ref_name }}
-        draft: false
-        prerelease: ${{ contains(github.ref_name, 'beta') || contains(github.ref_name, 'alpha') }}
-        generate_release_notes: true
-        files: release-files/*
-        fail_on_unmatched_files: false
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build Status
+        run: |
+          if [ "${{ needs.build.result }}" = "success" ] && [ "${{ needs.release.result }}" = "success" ]; then
+            echo "Build and release completed successfully"
+          else
+            echo "Build or release failed"
+            exit 1
+          fi

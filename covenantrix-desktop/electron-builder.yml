@@ -1,84 +1,98 @@
-appId: com.covenantrix.app
+appId: com.covenantrix.desktop
 productName: Covenantrix
 copyright: Copyright © 2025 ${author}
 
+# CRITICAL: Proper file inclusion/exclusion
+files:
+  - dist/**/*
+  - electron/**/*
+  - resources/**/*
+  - package.json
+  - "!**/*.ts"
+  - "!**/*.map"
+  - "!src"
+  - "!public"
+  - "!node_modules/**/{CHANGELOG.md,README.md,LICENSE,*.txt}"
+  - "!node_modules/**/{test,__tests__,tests,powered-test,example,examples}"
+  - "!node_modules/**/{*.d.ts,*.md,*.markdown}"
+  - "!node_modules/**/{tsconfig.json,tslint.json,eslint*,prettier*}"
+  - "!node_modules/**/{.github,.vscode,.idea}"
+  - "!**/{.git,.gitignore,.gitattributes}"
+  - "!**/{.DS_Store,Thumbs.db}"
+
+# Use asar for better compression
+asar: true
+asarUnpack:
+  - resources/backend/**/*
+
 directories:
   buildResources: build
-  output: dist/release
+  output: dist
 
-files:
-  - "dist-electron/**/*"
-  - "electron/**/*"
-  - "!electron/**/*.ts"
-  - "node_modules/**/*"
-  - "package.json"
-  - "!**/.vscode/*"
-  - "!src/*"
-  - "!*.md"
-  - "!*.config.{js,ts}"
+# Compression for smaller installers
+compression: maximum
 
-extraResources:
-  - from: ../backend
-    to: backend
-    filter:
-      - "**/*"
-      - "!**/__pycache__/**"
-      - "!**/*.pyc"
-      - "!**/*.pyo"
-      - "!**/tests/**"
-      - "!**/.pytest_cache/**"
-      - "!main.spec"
-  - from: ../dist/python-dist
-    to: python-dist
-    filter:
-      - "**/*"
-
-asarUnpack:
-  - "resources/**"
-  - "backend/**"
-  - "python-dist/**"
-
+# ============================================
+# WINDOWS CONFIGURATION
+# ============================================
 win:
   target:
     - target: nsis
       arch:
         - x64
   icon: build/icon.ico
+  artifactName: ${productName}-Setup-${version}.${ext}
   
 nsis:
   oneClick: false
   allowToChangeInstallationDirectory: true
-  perMachine: true
-  deleteAppDataOnUninstall: true
-  createDesktopShortcut: always
+  createDesktopShortcut: true
   createStartMenuShortcut: true
+  shortcutName: ${productName}
+  installerIcon: build/icon.ico
+  uninstallerIcon: build/icon.ico
+  license: LICENSE
+  deleteAppDataOnUninstall: true
+  # Compression for smaller installer
+  packElevateHelper: false
+  perMachine: false
+  unicode: true
 
+# ============================================
+# MACOS CONFIGURATION
+# ============================================
 mac:
   target:
     - target: dmg
       arch:
-        - x64
-        - arm64
+        - universal
   icon: build/icon.icns
   category: public.app-category.productivity
   hardenedRuntime: true
   gatekeeperAssess: false
   entitlements: build/entitlements.mac.plist
   entitlementsInherit: build/entitlements.mac.plist
-
+  artifactName: ${productName}-${version}.${ext}
+  # Sign for distribution (requires Apple Developer account)
+  # identity: "Developer ID Application: Your Name (TEAM_ID)"
+  
 dmg:
   contents:
+    - x: 130
+      y: 220
     - x: 410
-      y: 150
+      y: 220
       type: link
       path: /Applications
-    - x: 130
-      y: 150
-      type: file
+  sign: false
+  background: build/background.png
   window:
     width: 540
     height: 380
 
+# ============================================
+# LINUX CONFIGURATION
+# ============================================
 linux:
   target:
     - target: AppImage
@@ -86,12 +100,38 @@ linux:
         - x64
   icon: build/icon.png
   category: Office
+  artifactName: ${productName}-${version}.${ext}
+  synopsis: AI-powered document analysis assistant
+  description: Covenantrix is an AI-powered desktop application that helps you analyze and understand your documents using advanced RAG technology.
+  
+appImage:
+  license: LICENSE
+  synopsis: AI-powered document analysis
+  category: Office
 
+# ============================================
+# AUTO-UPDATE CONFIGURATION
+# ============================================
 publish:
   provider: github
-  repo: Covenantrix-DT
   owner: RandomWilder
+  repo: covenantrix-desktop
   releaseType: release
+  publishAutoUpdate: true
 
-electronDownload:
-  mirror: https://npmmirror.com/mirrors/electron/
+# ============================================
+# PROTOCOLS (for deep linking if needed)
+# ============================================
+protocols:
+  name: covenantrix
+  schemes:
+    - covenantrix
+
+# ============================================
+# BUILD RESOURCES
+# ============================================
+extraResources:
+  - from: resources
+    to: resources
+    filter:
+      - "**/*"
