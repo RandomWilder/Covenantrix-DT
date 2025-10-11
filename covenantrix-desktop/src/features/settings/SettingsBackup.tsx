@@ -21,7 +21,7 @@ interface SettingsBackupProps {
 }
 
 const SettingsBackup: React.FC<SettingsBackupProps> = ({ onImport }) => {
-  const { settings, exportSettings, importSettings } = useSettings();
+  const { settings, importSettings } = useSettings();
   const { showToast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
   
@@ -101,7 +101,7 @@ const SettingsBackup: React.FC<SettingsBackupProps> = ({ onImport }) => {
       }
 
       const importedSettings = await readSettingsFile(file);
-      await importSettings(importedSettings);
+      await importSettings(JSON.stringify(importedSettings));
       
       showToast('Settings imported successfully', 'success');
       setShowImportModal(false);

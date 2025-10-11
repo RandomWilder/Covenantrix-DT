@@ -46,7 +46,7 @@ export class UploadApiService extends ApiService {
       }
     })
 
-    return response.data
+    return response.data as BatchUploadResponse
   }
 
   /**
@@ -57,7 +57,7 @@ export class UploadApiService extends ApiService {
       file_ids: fileIds
     })
 
-    return response.data
+    return response.data as BatchUploadResponse
   }
 
   /**
@@ -69,7 +69,7 @@ export class UploadApiService extends ApiService {
     if (pageToken) params.append('page_token', pageToken)
 
     const response = await this.get(`/documents/drive/files?${params.toString()}`)
-    return response.data
+    return response.data as GoogleDriveListResponse
   }
 
   /**
@@ -94,7 +94,7 @@ export class UploadApiService extends ApiService {
    */
   async initiateGoogleAuth(): Promise<{ authUrl: string }> {
     const response = await this.post('/auth/google/authorize')
-    return response.data
+    return response.data as { authUrl: string }
   }
 }
 

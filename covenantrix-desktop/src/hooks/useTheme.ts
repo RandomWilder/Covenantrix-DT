@@ -5,7 +5,6 @@
 
 import { useEffect, useState } from 'react';
 import { useSettings } from './useSettings';
-import { Theme } from '../types/settings';
 
 export const useTheme = () => {
   const { settings } = useSettings();

@@ -3,11 +3,12 @@
  * Guides new users through initial settings configuration
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { CheckCircle, ArrowRight, Settings, Key, Globe, Brain, Palette } from 'lucide-react';
 import { useSettings } from '../../contexts/SettingsContext';
 import { useToast } from '../../hooks/useToast';
 import { UserSettings } from '../../types/settings';
+import { getDefaultSettings } from '../../utils/settings';
 
 interface SettingsSetupProps {
   onComplete: () => void;
@@ -22,6 +23,7 @@ const SettingsSetup: React.FC<SettingsSetupProps> = ({ onComplete, onSkip }) => 
   const [currentStep, setCurrentStep] = useState<SetupStep>('welcome');
   const [isValidating, setIsValidating] = useState(false);
   const [validationResults, setValidationResults] = useState<Record<string, boolean>>({});
+  const defaults = getDefaultSettings();
 
   const steps = [
     { id: 'welcome', title: 'Welcome to Covenantrix', icon: Settings },
@@ -205,6 +207,7 @@ const SettingsSetup: React.FC<SettingsSetupProps> = ({ onComplete, onSkip }) => 
                   value={settings?.language?.ui_language || 'auto'}
                   onChange={(e) => handleSettingsChange({
                     language: {
+                      ...defaults.language,
                       ...settings?.language,
                       ui_language: e.target.value as 'auto' | 'en' | 'es'
                     }
@@ -225,6 +228,7 @@ const SettingsSetup: React.FC<SettingsSetupProps> = ({ onComplete, onSkip }) => 
                   value={settings?.language?.agent_language || 'auto'}
                   onChange={(e) => handleSettingsChange({
                     language: {
+                      ...defaults.language,
                       ...settings?.language,
                       agent_language: e.target.value as 'auto' | 'en' | 'es' | 'fr' | 'he' | 'de'
                     }
@@ -267,6 +271,7 @@ const SettingsSetup: React.FC<SettingsSetupProps> = ({ onComplete, onSkip }) => 
                   value={settings?.rag?.search_mode || 'hybrid'}
                   onChange={(e) => handleSettingsChange({
                     rag: {
+                      ...defaults.rag,
                       ...settings?.rag,
                       search_mode: e.target.value as 'naive' | 'local' | 'global' | 'hybrid'
                     }
@@ -290,6 +295,7 @@ const SettingsSetup: React.FC<SettingsSetupProps> = ({ onComplete, onSkip }) => 
                   checked={settings?.rag?.enable_ocr ?? true}
                   onChange={(e) => handleSettingsChange({
                     rag: {
+                      ...defaults.rag,
                       ...settings?.rag,
                       enable_ocr: e.target.checked
                     }
@@ -308,6 +314,7 @@ const SettingsSetup: React.FC<SettingsSetupProps> = ({ onComplete, onSkip }) => 
                   checked={settings?.rag?.use_reranking ?? true}
                   onChange={(e) => handleSettingsChange({
                     rag: {
+                      ...defaults.rag,
                       ...settings?.rag,
                       use_reranking: e.target.checked
                     }
@@ -352,6 +359,7 @@ const SettingsSetup: React.FC<SettingsSetupProps> = ({ onComplete, onSkip }) => 
                       key={theme.value}
                       onClick={() => handleSettingsChange({
                         ui: {
+                          ...defaults.ui,
                           ...settings?.ui,
                           theme: theme.value as 'light' | 'dark' | 'system'
                         }
@@ -378,6 +386,7 @@ const SettingsSetup: React.FC<SettingsSetupProps> = ({ onComplete, onSkip }) => 
                   checked={settings?.ui?.compact_mode ?? false}
                   onChange={(e) => handleSettingsChange({
                     ui: {
+                      ...defaults.ui,
                       ...settings?.ui,
                       compact_mode: e.target.checked
                     }

@@ -3,7 +3,7 @@
  * Helper functions for settings management and validation
  */
 
-import { UserSettings, ApiKeySettings, Language, Theme, FontSize } from '../types/settings';
+import { UserSettings, Language, Theme, FontSize } from '../types/settings';
 
 /**
  * Default settings factory
@@ -27,7 +27,8 @@ export const getDefaultSettings = (): UserSettings => {
     ui: {
       theme: 'system',
       compact_mode: false,
-      font_size: 'medium'
+      font_size: 'medium',
+      zoom_level: 1.0
     },
     privacy: {
       enable_telemetry: false,
@@ -66,7 +67,8 @@ export const validateAndNormalizeSettings = (settings: any): UserSettings => {
     ui: {
       theme: settings?.ui?.theme || defaults.ui.theme,
       compact_mode: settings?.ui?.compact_mode ?? defaults.ui.compact_mode,
-      font_size: settings?.ui?.font_size || defaults.ui.font_size
+      font_size: settings?.ui?.font_size || defaults.ui.font_size,
+      zoom_level: settings?.ui?.zoom_level ?? defaults.ui.zoom_level
     },
     privacy: {
       enable_telemetry: settings?.privacy?.enable_telemetry ?? defaults.privacy.enable_telemetry,

@@ -14,6 +14,7 @@ export interface ApiKeySettings {
   openai?: string;        // Only if mode === 'custom'
   cohere?: string;        // Only if mode === 'custom'  
   google?: string;        // Only if mode === 'custom'
+  google_vision?: string; // Only if mode === 'custom' (for OCR)
 }
 
 export interface RAGSettings {
