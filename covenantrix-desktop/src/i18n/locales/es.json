@@ -1,0 +1,148 @@
+{
+  "common": {
+    "save": "Guardar",
+    "cancel": "Cancelar",
+    "reset": "Restablecer",
+    "apply": "Aplicar",
+    "close": "Cerrar",
+    "next": "Siguiente",
+    "back": "Atrás",
+    "skip": "Omitir",
+    "loading": "Cargando...",
+    "error": "Error",
+    "success": "Éxito",
+    "warning": "Advertencia",
+    "info": "Información"
+  },
+  "settings": {
+    "title": "Configuración",
+    "apiKeys": {
+      "title": "Claves API",
+      "mode": "Modo de Clave API",
+      "default": "Modo Predeterminado",
+      "custom": "Modo Personalizado",
+      "defaultDescription": "Usar claves API preconfiguradas para acceso inmediato",
+      "customDescription": "Usar tus propias claves API para control total",
+      "openai": "Clave API de OpenAI",
+      "cohere": "Clave API de Cohere",
+      "googleVision": "Clave API de Google Vision",
+      "validate": "Validar Claves",
+      "validating": "Validando...",
+      "valid": "Válida",
+      "invalid": "Inválida",
+      "required": "Requerida para modo personalizado",
+      "recommended": "Recomendada para reranking",
+      "ocrRequired": "Requerida para función OCR"
+    },
+    "language": {
+      "title": "Idioma",
+      "preferred": "Idioma Preferido",
+      "agentLanguage": "Idioma de Respuesta IA",
+      "uiLanguage": "Idioma de Interfaz",
+      "auto": "Auto (Coincidir Idioma de Consulta)",
+      "systemDefault": "Auto (Predeterminado del Sistema)"
+    },
+    "rag": {
+      "title": "Configuración RAG",
+      "searchMode": "Modo de Búsqueda",
+      "topK": "Resultados Top-K",
+      "useReranking": "Usar Reranking Avanzado",
+      "enableOcr": "Habilitar OCR",
+      "searchModes": {
+        "naive": "Ingenuo",
+        "local": "Local",
+        "global": "Global",
+        "hybrid": "Híbrido (Recomendado)"
+      },
+      "descriptions": {
+        "hybrid": "Mejor equilibrio entre precisión y rendimiento",
+        "reranking": "Requiere clave API de Cohere",
+        "ocr": "Reconocimiento Óptico de Caracteres para documentos escaneados"
+      }
+    },
+    "appearance": {
+      "title": "Apariencia",
+      "theme": "Tema",
+      "compactMode": "Modo Compacto",
+      "fontSize": "Tamaño de Fuente",
+      "themes": {
+        "light": "Claro",
+        "dark": "Oscuro",
+        "system": "Sistema"
+      },
+      "fontSizes": {
+        "small": "Pequeño",
+        "medium": "Mediano",
+        "large": "Grande"
+      }
+    },
+    "privacy": {
+      "title": "Privacidad",
+      "enableTelemetry": "Habilitar Telemetría",
+      "enableCloudBackup": "Habilitar Respaldo en la Nube",
+      "retainHistory": "Retener Historial de Chat",
+      "descriptions": {
+        "telemetry": "Ayudar a mejorar la app enviando datos de uso anónimos",
+        "cloudBackup": "Sincronizar configuración entre dispositivos (próximamente)",
+        "history": "Mantener historial de conversación para contexto"
+      }
+    }
+  },
+  "onboarding": {
+    "welcome": {
+      "title": "Bienvenido a Covenantrix",
+      "description": "Configuremos tus preferencias para obtener la mejor experiencia con nuestra plataforma de inteligencia de documentos impulsada por IA.",
+      "whatWeConfigure": "Lo que configuraremos:",
+      "apiKeys": "Claves API para servicios de IA",
+      "language": "Preferencias de idioma",
+      "aiSettings": "Configuración de comportamiento de IA",
+      "appearance": "Apariencia visual"
+    },
+    "apiKeys": {
+      "title": "Configurar Claves API",
+      "description": "Configura tus claves API para habilitar funciones impulsadas por IA",
+      "defaultMode": "Modo Predeterminado (Recomendado)",
+      "defaultDescription": "Usar nuestras claves API preconfiguradas para acceso inmediato a todas las funciones.",
+      "customMode": "Modo Personalizado",
+      "customDescription": "Usar tus propias claves API para control total y potencialmente mejor rendimiento.",
+      "customWarning": "Necesitarás configurar tus claves API en la configuración después de la configuración. Puedes acceder a la configuración en cualquier momento desde el menú."
+    },
+    "language": {
+      "title": "Preferencias de Idioma",
+      "description": "Elige tu idioma preferido para la interfaz y respuestas de IA"
+    },
+    "rag": {
+      "title": "Configuración de IA",
+      "description": "Configura cómo la IA procesa y responde a tus documentos"
+    },
+    "appearance": {
+      "title": "Apariencia",
+      "description": "Personaliza la apariencia de tu aplicación"
+    },
+    "complete": {
+      "title": "¡Configuración Completa!",
+      "description": "Tu aplicación Covenantrix está ahora configurada y lista para usar. Siempre puedes cambiar esta configuración más tarde desde el menú de configuración.",
+      "whatsNext": "¿Qué sigue?",
+      "uploadDocument": "Sube tu primer documento",
+      "askQuestions": "Comienza a hacer preguntas sobre tus documentos",
+      "exploreAI": "Explora insights impulsados por IA",
+      "customizeSettings": "Personaliza la configuración según sea necesario"
+    }
+  },
+  "validation": {
+    "required": "Este campo es requerido",
+    "invalidApiKey": "Formato de clave API inválido",
+    "apiKeyValidationFailed": "Validación de clave API falló",
+    "settingsSaveFailed": "Error al guardar configuración",
+    "settingsLoadFailed": "Error al cargar configuración",
+    "invalidSettings": "Formato de configuración inválido"
+  },
+  "notifications": {
+    "settingsSaved": "Configuración guardada y aplicada exitosamente",
+    "settingsReset": "Configuración restablecida a predeterminados",
+    "apiKeysValidated": "Claves API validadas exitosamente",
+    "apiKeysInvalid": "Una o más claves API son inválidas",
+    "settingsApplied": "Configuración aplicada exitosamente",
+    "settingsLoadError": "Error al cargar configuración, usando predeterminados"
+  }
+}

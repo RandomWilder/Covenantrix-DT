@@ -1,0 +1,50 @@
+# Core FastAPI and backend dependencies
+fastapi>=0.104.1
+uvicorn[standard]>=0.24.0
+pydantic>=2.5.0
+pydantic-settings>=2.1.0
+python-dotenv>=1.0.0
+cryptography>=41.0.0
+python-multipart
+aiofiles
+aiohttp>=3.8.0
+
+# AI and RAG dependencies
+openai>=1.3.0
+lightrag-hku
+langdetect>=1.0.9
+cohere>=5.0.0  # Cohere reranking API
+
+# File type detection
+python-magic-bin>=0.4.14; sys_platform == "win32"  # Windows - includes libmagic
+python-magic>=0.4.27; sys_platform != "win32"  # macOS/Linux
+
+# Date and geocoding utilities
+python-dateutil>=2.8.0         # Enhanced date parsing for analytics
+geopy>=2.4.0                   # Geocoding service for address-to-coordinates conversion
+
+# External API dependencies
+httpx>=0.24.0                  # Async HTTP client for external APIs
+
+# Development and testing
+pytest>=7.4.0
+pytest-asyncio>=0.21.0        # Async testing support
+httpx>=0.26.0                 # HTTP client for testing
+
+# Document processing libraries
+PyPDF2>=3.0.0                    # PDF text extraction
+python-docx>=1.1.0              # DOCX/DOC text extraction
+Pillow>=10.0.0                  # Image processing for OCR
+pytesseract>=0.3.10             # OCR text extraction from images
+openpyxl>=3.1.0                 # Excel file processing
+python-pptx>=0.6.21             # PowerPoint file processing
+PyMuPDF==1.24.0                 # PDF-to-image rendering for OCR
+
+# Google APIs and OAuth
+google-auth>=2.23.0
+google-auth-oauthlib>=1.1.0
+google-auth-httplib2>=0.2.0
+google-api-python-client>=2.100.0
+google-cloud-vision>=3.4.0  # Google Vision API client
+
+# Note: Google Vision API and OAuth integration ready for implementation

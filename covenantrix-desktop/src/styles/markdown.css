@@ -1,0 +1,226 @@
+/* Markdown Rendering Styles for Chat Messages */
+
+.markdown-content {
+  line-height: 1.6;
+  color: inherit;
+}
+
+/* Headers */
+.markdown-content h1,
+.markdown-content h2,
+.markdown-content h3,
+.markdown-content h4,
+.markdown-content h5,
+.markdown-content h6 {
+  margin-top: 1.5em;
+  margin-bottom: 0.5em;
+  font-weight: 600;
+  line-height: 1.25;
+}
+
+.markdown-content h1:first-child,
+.markdown-content h2:first-child,
+.markdown-content h3:first-child,
+.markdown-content h4:first-child,
+.markdown-content h5:first-child,
+.markdown-content h6:first-child {
+  margin-top: 0;
+}
+
+.markdown-content h1 {
+  font-size: 1.5em;
+  border-bottom: 1px solid rgba(128, 128, 128, 0.2);
+  padding-bottom: 0.3em;
+}
+
+.markdown-content h2 {
+  font-size: 1.3em;
+  border-bottom: 1px solid rgba(128, 128, 128, 0.15);
+  padding-bottom: 0.3em;
+}
+
+.markdown-content h3 {
+  font-size: 1.15em;
+}
+
+.markdown-content h4 {
+  font-size: 1.05em;
+}
+
+.markdown-content h5,
+.markdown-content h6 {
+  font-size: 1em;
+}
+
+/* Paragraphs */
+.markdown-content p {
+  margin-top: 0;
+  margin-bottom: 1em;
+}
+
+.markdown-content p:last-child {
+  margin-bottom: 0;
+}
+
+/* Lists */
+.markdown-content ul,
+.markdown-content ol {
+  margin-top: 0;
+  margin-bottom: 1em;
+  padding-left: 2em;
+}
+
+.markdown-content li {
+  margin-bottom: 0.25em;
+}
+
+.markdown-content li > p {
+  margin-bottom: 0.5em;
+}
+
+/* Code blocks */
+.markdown-content pre {
+  background-color: rgba(0, 0, 0, 0.05);
+  border-radius: 6px;
+  padding: 1em;
+  overflow-x: auto;
+  margin-top: 0;
+  margin-bottom: 1em;
+}
+
+.dark .markdown-content pre {
+  background-color: rgba(0, 0, 0, 0.3);
+}
+
+.markdown-content code {
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 0.9em;
+}
+
+.markdown-content pre code {
+  background-color: transparent;
+  padding: 0;
+  border-radius: 0;
+  font-size: 0.875em;
+}
+
+/* Inline code */
+.markdown-content :not(pre) > code {
+  background-color: rgba(0, 0, 0, 0.08);
+  border-radius: 3px;
+  padding: 0.2em 0.4em;
+  font-size: 0.85em;
+}
+
+.dark .markdown-content :not(pre) > code {
+  background-color: rgba(255, 255, 255, 0.1);
+}
+
+/* Blockquotes */
+.markdown-content blockquote {
+  margin: 1em 0;
+  padding-left: 1em;
+  border-left: 4px solid rgba(128, 128, 128, 0.3);
+  color: rgba(0, 0, 0, 0.7);
+}
+
+.dark .markdown-content blockquote {
+  color: rgba(255, 255, 255, 0.7);
+  border-left-color: rgba(255, 255, 255, 0.3);
+}
+
+.markdown-content blockquote > :first-child {
+  margin-top: 0;
+}
+
+.markdown-content blockquote > :last-child {
+  margin-bottom: 0;
+}
+
+/* Links */
+.markdown-content a {
+  color: #3b82f6;
+  text-decoration: none;
+}
+
+.markdown-content a:hover {
+  text-decoration: underline;
+}
+
+.dark .markdown-content a {
+  color: #60a5fa;
+}
+
+/* Horizontal rules */
+.markdown-content hr {
+  border: none;
+  border-top: 1px solid rgba(128, 128, 128, 0.2);
+  margin: 1.5em 0;
+}
+
+/* Tables */
+.markdown-content table {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 1em 0;
+}
+
+.markdown-content table th,
+.markdown-content table td {
+  border: 1px solid rgba(128, 128, 128, 0.2);
+  padding: 0.5em 0.75em;
+  text-align: left;
+}
+
+.markdown-content table th {
+  background-color: rgba(0, 0, 0, 0.03);
+  font-weight: 600;
+}
+
+.dark .markdown-content table th {
+  background-color: rgba(255, 255, 255, 0.05);
+}
+
+.dark .markdown-content table th,
+.dark .markdown-content table td {
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+/* Images */
+.markdown-content img {
+  max-width: 100%;
+  height: auto;
+}
+
+/* Strong and emphasis */
+.markdown-content strong {
+  font-weight: 600;
+}
+
+.markdown-content em {
+  font-style: italic;
+}
+
+/* RTL Support */
+[dir="rtl"] .markdown-content ul,
+[dir="rtl"] .markdown-content ol {
+  padding-left: 0;
+  padding-right: 2em;
+}
+
+[dir="rtl"] .markdown-content blockquote {
+  padding-left: 0;
+  padding-right: 1em;
+  border-left: none;
+  border-right: 4px solid rgba(128, 128, 128, 0.3);
+}
+
+[dir="rtl"].dark .markdown-content blockquote {
+  border-right-color: rgba(255, 255, 255, 0.3);
+}
+
+[dir="rtl"] .markdown-content table th,
+[dir="rtl"] .markdown-content table td {
+  text-align: right;
+}
+

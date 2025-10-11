@@ -1,0 +1,266 @@
+name: Build and Release Covenantrix Desktop
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'  # Triggers on version tags like v1.0.0
+  workflow_dispatch:  # Allows manual triggering
+
+env:
+  PYTHON_VERSION: '3.11'
+  NODE_VERSION: '20'
+
+jobs:
+  # Build Python backend for each platform
+  build-backend:
+    name: Build Backend - ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        include:
+          - os: windows-latest
+            artifact: backend-windows
+          - os: macos-latest
+            artifact: backend-macos
+          - os: ubuntu-latest
+            artifact: backend-linux
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install Python dependencies
+        working-directory: ./backend
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pyinstaller
+
+      - name: Build backend with PyInstaller
+        working-directory: ./backend
+        run: |
+          pyinstaller --name main \
+            --onefile \
+            --clean \
+            --noconfirm \
+            --log-level WARN \
+            --add-data "core:core" \
+            --add-data "api:api" \
+            --add-data "domain:domain" \
+            --add-data "infrastructure:infrastructure" \
+            --hidden-import uvicorn.logging \
+            --hidden-import uvicorn.loops \
+            --hidden-import uvicorn.loops.auto \
+            --hidden-import uvicorn.protocols \
+            --hidden-import uvicorn.protocols.http \
+            --hidden-import uvicorn.protocols.http.auto \
+            --hidden-import uvicorn.protocols.websockets \
+            --hidden-import uvicorn.protocols.websockets.auto \
+            --hidden-import uvicorn.lifespan \
+            --hidden-import uvicorn.lifespan.on \
+            --collect-all lightrag \
+            --collect-all openai \
+            --collect-all fastapi \
+            main.py
+
+      - name: Copy .env.example to dist
+        working-directory: ./backend
+        shell: bash
+        run: |
+          cp .env.example dist/.env.example
+
+      - name: Upload backend artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact }}
+          path: ./backend/dist/
+          retention-days: 1
+
+  # Build desktop app for each platform
+  build-desktop:
+    name: Build Desktop - ${{ matrix.os }}
+    needs: build-backend
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        include:
+          - os: windows-latest
+            platform: win
+            backend-artifact: backend-windows
+          - os: macos-latest
+            platform: mac
+            backend-artifact: backend-macos
+          - os: ubuntu-latest
+            platform: linux
+            backend-artifact: backend-linux
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: './covenantrix-desktop/package-lock.json'
+
+      - name: Download backend artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ matrix.backend-artifact }}
+          path: ./covenantrix-desktop/backend
+
+      - name: Make backend executable (Unix)
+        if: matrix.os != 'windows-latest'
+        working-directory: ./covenantrix-desktop
+        run: |
+          chmod +x backend/main
+
+      - name: Install dependencies
+        working-directory: ./covenantrix-desktop
+        run: npm ci
+
+      - name: Build desktop app
+        working-directory: ./covenantrix-desktop
+        run: npm run build
+
+      - name: Package and publish - Windows
+        if: matrix.platform == 'win'
+        working-directory: ./covenantrix-desktop
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: npm run release:win
+
+      - name: Package and publish - macOS
+        if: matrix.platform == 'mac'
+        working-directory: ./covenantrix-desktop
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CSC_LINK: ${{ secrets.MAC_CERT_BASE64 }}
+          CSC_KEY_PASSWORD: ${{ secrets.MAC_CERT_PASSWORD }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: npm run release:mac
+
+      - name: Package and publish - Linux
+        if: matrix.platform == 'linux'
+        working-directory: ./covenantrix-desktop
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: npm run release:linux
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: desktop-${{ matrix.platform }}
+          path: |
+            ./covenantrix-desktop/dist/*.exe
+            ./covenantrix-desktop/dist/*.dmg
+            ./covenantrix-desktop/dist/*.AppImage
+            ./covenantrix-desktop/dist/*.yml
+          retention-days: 7
+
+  # Create GitHub Release
+  create-release:
+    name: Create GitHub Release
+    needs: build-desktop
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/')
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: ./release-artifacts
+
+      - name: Extract version from tag
+        id: version
+        run: |
+          VERSION=${GITHUB_REF#refs/tags/v}
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Generate release notes
+        id: release_notes
+        run: |
+          cat > release_notes.md << EOF
+          ## Covenantrix Desktop ${{ steps.version.outputs.version }}
+          
+          ### 🎉 What's New
+          
+          - Update this section with your changes
+          
+          ### 📦 Installation
+          
+          **Windows:**
+          - Download \`Covenantrix-Setup-${{ steps.version.outputs.version }}.exe\`
+          - Run the installer
+          - Auto-update will be available for future releases
+          
+          **macOS:**
+          - Download \`Covenantrix-${{ steps.version.outputs.version }}.dmg\`
+          - Open the DMG and drag Covenantrix to Applications
+          - Auto-update will be available for future releases
+          
+          **Linux:**
+          - Download \`Covenantrix-${{ steps.version.outputs.version }}.AppImage\`
+          - Make it executable: \`chmod +x Covenantrix-*.AppImage\`
+          - Run the AppImage
+          - Auto-update will be available for future releases
+          
+          ### ✨ Features
+          
+          - RAG-powered document intelligence
+          - Self-contained with bundled Python backend
+          - No additional dependencies required
+          - Automatic updates with user approval
+          
+          ### 🔧 System Requirements
+          
+          - Windows 10 or later
+          - macOS 10.13 or later
+          - Linux with GLIBC 2.27 or later
+          
+          ### 📝 Full Changelog
+          
+          See the commit history for detailed changes.
+          
+          EOF
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          name: Covenantrix v${{ steps.version.outputs.version }}
+          body_path: release_notes.md
+          draft: false
+          prerelease: false
+          files: |
+            ./release-artifacts/desktop-win/*
+            ./release-artifacts/desktop-mac/*
+            ./release-artifacts/desktop-linux/*
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # Notify on success
+  notify-success:
+    name: Notify Build Success
+    needs: create-release
+    runs-on: ubuntu-latest
+    if: success()
+    
+    steps:
+      - name: Success notification
+        run: |
+          echo "✅ Release build completed successfully!"
+          echo "Version: ${GITHUB_REF#refs/tags/}"
+          echo "Repository: https://github.com/RandomWilder/Covenantrix-DT"
+          echo "Artifacts published to GitHub Releases"

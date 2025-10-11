@@ -1,0 +1,148 @@
+{
+  "common": {
+    "save": "Save",
+    "cancel": "Cancel",
+    "reset": "Reset",
+    "apply": "Apply",
+    "close": "Close",
+    "next": "Next",
+    "back": "Back",
+    "skip": "Skip",
+    "loading": "Loading...",
+    "error": "Error",
+    "success": "Success",
+    "warning": "Warning",
+    "info": "Information"
+  },
+  "settings": {
+    "title": "Settings",
+    "apiKeys": {
+      "title": "API Keys",
+      "mode": "API Key Mode",
+      "default": "Default Mode",
+      "custom": "Custom Mode",
+      "defaultDescription": "Use pre-configured API keys for immediate access",
+      "customDescription": "Use your own API keys for full control",
+      "openai": "OpenAI API Key",
+      "cohere": "Cohere API Key",
+      "googleVision": "Google Vision API Key",
+      "validate": "Validate Keys",
+      "validating": "Validating...",
+      "valid": "Valid",
+      "invalid": "Invalid",
+      "required": "Required for custom mode",
+      "recommended": "Recommended for reranking",
+      "ocrRequired": "Required for OCR feature"
+    },
+    "language": {
+      "title": "Language",
+      "preferred": "Preferred Language",
+      "agentLanguage": "AI Response Language",
+      "uiLanguage": "Interface Language",
+      "auto": "Auto (Match Query Language)",
+      "systemDefault": "Auto (System Default)"
+    },
+    "rag": {
+      "title": "RAG Configuration",
+      "searchMode": "Search Mode",
+      "topK": "Top-K Results",
+      "useReranking": "Use Advanced Reranking",
+      "enableOcr": "Enable OCR",
+      "searchModes": {
+        "naive": "Naive",
+        "local": "Local",
+        "global": "Global",
+        "hybrid": "Hybrid (Recommended)"
+      },
+      "descriptions": {
+        "hybrid": "Best balance of accuracy and performance",
+        "reranking": "Requires Cohere API key",
+        "ocr": "Optical Character Recognition for scanned documents"
+      }
+    },
+    "appearance": {
+      "title": "Appearance",
+      "theme": "Theme",
+      "compactMode": "Compact Mode",
+      "fontSize": "Font Size",
+      "themes": {
+        "light": "Light",
+        "dark": "Dark",
+        "system": "System"
+      },
+      "fontSizes": {
+        "small": "Small",
+        "medium": "Medium",
+        "large": "Large"
+      }
+    },
+    "privacy": {
+      "title": "Privacy",
+      "enableTelemetry": "Enable Telemetry",
+      "enableCloudBackup": "Enable Cloud Backup",
+      "retainHistory": "Retain Chat History",
+      "descriptions": {
+        "telemetry": "Help improve the app by sending anonymous usage data",
+        "cloudBackup": "Sync settings across devices (coming soon)",
+        "history": "Keep conversation history for context"
+      }
+    }
+  },
+  "onboarding": {
+    "welcome": {
+      "title": "Welcome to Covenantrix",
+      "description": "Let's set up your preferences to get the best experience with our AI-powered document intelligence platform.",
+      "whatWeConfigure": "What we'll configure:",
+      "apiKeys": "API keys for AI services",
+      "language": "Language preferences",
+      "aiSettings": "AI behavior settings",
+      "appearance": "Visual appearance"
+    },
+    "apiKeys": {
+      "title": "Configure API Keys",
+      "description": "Set up your API keys to enable AI-powered features",
+      "defaultMode": "Default Mode (Recommended)",
+      "defaultDescription": "Use our pre-configured API keys for immediate access to all features.",
+      "customMode": "Custom Mode",
+      "customDescription": "Use your own API keys for full control and potentially better performance.",
+      "customWarning": "You'll need to configure your API keys in the settings after setup. You can access settings anytime from the menu."
+    },
+    "language": {
+      "title": "Language Preferences",
+      "description": "Choose your preferred language for the interface and AI responses"
+    },
+    "rag": {
+      "title": "AI Configuration",
+      "description": "Configure how the AI processes and responds to your documents"
+    },
+    "appearance": {
+      "title": "Appearance",
+      "description": "Customize the look and feel of your application"
+    },
+    "complete": {
+      "title": "Setup Complete!",
+      "description": "Your Covenantrix application is now configured and ready to use. You can always change these settings later from the settings menu.",
+      "whatsNext": "What's next?",
+      "uploadDocument": "Upload your first document",
+      "askQuestions": "Start asking questions about your documents",
+      "exploreAI": "Explore AI-powered insights",
+      "customizeSettings": "Customize settings as needed"
+    }
+  },
+  "validation": {
+    "required": "This field is required",
+    "invalidApiKey": "Invalid API key format",
+    "apiKeyValidationFailed": "API key validation failed",
+    "settingsSaveFailed": "Failed to save settings",
+    "settingsLoadFailed": "Failed to load settings",
+    "invalidSettings": "Invalid settings format"
+  },
+  "notifications": {
+    "settingsSaved": "Settings saved and applied successfully",
+    "settingsReset": "Settings reset to defaults",
+    "apiKeysValidated": "API keys validated successfully",
+    "apiKeysInvalid": "One or more API keys are invalid",
+    "settingsApplied": "Settings applied successfully",
+    "settingsLoadError": "Failed to load settings, using defaults"
+  }
+}

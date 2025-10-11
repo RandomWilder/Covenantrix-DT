@@ -1,0 +1,76 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  
+  body {
+    @apply bg-background text-foreground;
+    font-feature-settings: "rlig" 1, "calt" 1;
+  }
+  
+  html {
+    @apply h-full;
+  }
+  
+  #root {
+    @apply h-full;
+  }
+}
+
+@layer components {
+  .app-window {
+    @apply h-screen w-screen overflow-hidden;
+  }
+  
+  .sidebar {
+    @apply w-64 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700;
+  }
+  
+  .main-content {
+    @apply flex-1 bg-gray-50 dark:bg-gray-900;
+  }
+  
+  .header {
+    @apply h-16 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700;
+  }
+  
+  .status-bar {
+    @apply h-8 bg-gray-100 dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700;
+  }
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  @apply bg-gray-100 dark:bg-gray-800;
+}
+
+::-webkit-scrollbar-thumb {
+  @apply bg-gray-300 dark:bg-gray-600 rounded-full;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  @apply bg-gray-400 dark:bg-gray-500;
+}
+
+/* Electron specific styles */
+body {
+  -webkit-user-select: none;
+  -webkit-app-region: no-drag;
+}
+
+.drag-region {
+  -webkit-app-region: drag;
+}
+
+.no-drag {
+  -webkit-app-region: no-drag;
+}

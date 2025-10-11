@@ -1,0 +1,3 @@
+"""
+Entity domain module
+"""
