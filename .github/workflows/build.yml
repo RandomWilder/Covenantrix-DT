@@ -5,39 +5,21 @@ on:
     tags:
       - 'v*'
   workflow_dispatch:
-    inputs:
-      version:
-        description: 'Release version (e.g., 1.0.0)'
-        required: true
-        type: string
 
 env:
   PYTHON_VERSION: '3.11'
   NODE_VERSION: '20'
 
 jobs:
-  build:
-    name: Build ${{ matrix.platform }}
+  release:
+    name: Build and Release
     runs-on: ${{ matrix.os }}
     
     strategy:
-      fail-fast: false
       matrix:
-        include:
-          - os: windows-latest
-            platform: win
-            arch: x64
-          - os: macos-latest
-            platform: mac
-            arch: universal
-          - os: ubuntu-latest
-            platform: linux
-            arch: x64
+        os: [windows-latest, macos-latest, ubuntu-latest]
 
     steps:
-      # ============================================
-      # 1. CHECKOUT AND SETUP
-      # ============================================
       - name: Checkout code
         uses: actions/checkout@v4
 
@@ -52,215 +34,30 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: ${{ env.PYTHON_VERSION }}
-          cache: 'pip'
-          cache-dependency-path: backend/requirements.txt
 
-      # ============================================
-      # 2. BUILD PYTHON BACKEND WITH PYINSTALLER
-      # ============================================
-      - name: Install Python dependencies
+      - name: Build Python Backend
         working-directory: backend
-        run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt
-          pip install pyinstaller
-
-      - name: Build Backend Executable
-        working-directory: backend
-        run: |
-          pyinstaller \
-            --name backend \
-            --onefile \
-            --clean \
-            --noconfirm \
-            --log-level WARN \
-            --strip \
-            --noupx \
-            --exclude-module pytest \
-            --exclude-module IPython \
-            --exclude-module matplotlib \
-            --exclude-module notebook \
-            --hidden-import=fastapi \
-            --hidden-import=uvicorn \
-            --hidden-import=pydantic \
-            --collect-all lightrag \
-            main.py
-
-      - name: Verify Backend Build
-        working-directory: backend/dist
         shell: bash
         run: |
-          ls -lh
-          if [ "${{ matrix.platform }}" = "win" ]; then
-            ./backend.exe --version || echo "Backend built successfully"
-          else
-            chmod +x backend
-            ./backend --version || echo "Backend built successfully"
-          fi
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt pyinstaller
+          pyinstaller main.spec
 
-      # ============================================
-      # 3. PREPARE BACKEND FOR ELECTRON PACKAGING
-      # ============================================
-      - name: Copy Backend to Electron Resources
+      - name: Prepare Backend for Packaging
         shell: bash
         run: |
           mkdir -p covenantrix-desktop/resources/backend
-          if [ "${{ matrix.platform }}" = "win" ]; then
-            cp backend/dist/backend.exe covenantrix-desktop/resources/backend/
-          else
-            cp backend/dist/backend covenantrix-desktop/resources/backend/
+          cp -r backend/dist/* covenantrix-desktop/resources/backend/
+          if [ "${{ runner.os }}" != "Windows" ]; then
             chmod +x covenantrix-desktop/resources/backend/backend
           fi
 
-      # ============================================
-      # 4. BUILD ELECTRON APP
-      # ============================================
       - name: Install Frontend Dependencies
         working-directory: covenantrix-desktop
         run: npm ci
 
-      - name: Build React Frontend
+      - name: Build and Release Electron App
         working-directory: covenantrix-desktop
-        run: npm run build
-        env:
-          NODE_ENV: production
-
-      - name: Package Electron App
-        working-directory: covenantrix-desktop
-        run: |
-          if [ "${{ matrix.platform }}" = "win" ]; then
-            npm run package:win
-          elif [ "${{ matrix.platform }}" = "mac" ]; then
-            npm run package:mac
-          else
-            npm run package:linux
-          fi
-        shell: bash
+        run: npm run release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      # ============================================
-      # 5. VERIFY BUILD SIZE AND STRUCTURE
-      # ============================================
-      - name: Check Build Size
-        working-directory: covenantrix-desktop/dist
-        shell: bash
-        run: |
-          echo "=== Build Size Report ==="
-          du -sh * | sort -h
-          
-          # Find installer size
-          if [ "${{ matrix.platform }}" = "win" ]; then
-            SIZE=$(du -sm *.exe | cut -f1)
-            echo "Windows installer size: ${SIZE}MB"
-            if [ "$SIZE" -gt 200 ]; then
-              echo "WARNING: Build size exceeds 200MB!"
-            fi
-          elif [ "${{ matrix.platform }}" = "mac" ]; then
-            SIZE=$(du -sm *.dmg | cut -f1)
-            echo "macOS installer size: ${SIZE}MB"
-            if [ "$SIZE" -gt 250 ]; then
-              echo "WARNING: Build size exceeds 250MB!"
-            fi
-          else
-            SIZE=$(du -sm *.AppImage | cut -f1)
-            echo "Linux installer size: ${SIZE}MB"
-            if [ "$SIZE" -gt 200 ]; then
-              echo "WARNING: Build size exceeds 200MB!"
-            fi
-          fi
-
-      # ============================================
-      # 6. UPLOAD ARTIFACTS
-      # ============================================
-      - name: Upload Build Artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: ${{ matrix.platform }}-installer
-          path: |
-            covenantrix-desktop/dist/*.exe
-            covenantrix-desktop/dist/*.dmg
-            covenantrix-desktop/dist/*.AppImage
-            covenantrix-desktop/dist/*.yml
-          if-no-files-found: error
-          retention-days: 30
-
-  # ============================================
-  # CREATE GITHUB RELEASE
-  # ============================================
-  release:
-    name: Create GitHub Release
-    needs: build
-    runs-on: ubuntu-latest
-    if: startsWith(github.ref, 'refs/tags/v')
-    
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Download all artifacts
-        uses: actions/download-artifact@v4
-        with:
-          path: dist-artifacts
-
-      - name: Prepare release files
-        run: |
-          mkdir -p release-files
-          find dist-artifacts -type f \( -name "*.exe" -o -name "*.dmg" -o -name "*.AppImage" -o -name "*.yml" \) -exec cp {} release-files/ \;
-          ls -lh release-files/
-
-      - name: Generate release notes
-        id: release_notes
-        run: |
-          VERSION=${GITHUB_REF#refs/tags/v}
-          cat > release_notes.md << EOF
-          ## Covenantrix Desktop v${VERSION}
-          
-          ### Installation
-          
-          **Windows**: Download and run \`Covenantrix-Setup-${VERSION}.exe\`
-          **macOS**: Download, mount \`Covenantrix-${VERSION}.dmg\`, and drag to Applications
-          **Linux**: Download \`Covenantrix-${VERSION}.AppImage\`, make executable, and run
-          
-          ### Auto-Updates
-          The application will automatically check for updates and notify you when a new version is available.
-          
-          ### Changelog
-          - See commit history for detailed changes
-          
-          ### Requirements
-          - No Python installation required (backend is bundled)
-          - Windows: Windows 10 or later
-          - macOS: macOS 10.15 (Catalina) or later
-          - Linux: Ubuntu 20.04 or later, or equivalent
-          EOF
-
-      - name: Create GitHub Release
-        uses: softprops/action-gh-release@v1
-        with:
-          files: release-files/*
-          body_path: release_notes.md
-          draft: false
-          prerelease: false
-          generate_release_notes: true
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-  # ============================================
-  # NOTIFICATION (Optional)
-  # ============================================
-  notify:
-    name: Send Notification
-    needs: [build, release]
-    runs-on: ubuntu-latest
-    if: always()
-    
-    steps:
-      - name: Build Status
-        run: |
-          if [ "${{ needs.build.result }}" = "success" ] && [ "${{ needs.release.result }}" = "success" ]; then
-            echo "Build and release completed successfully"
-          else
-            echo "Build or release failed"
-            exit 1
-          fi
