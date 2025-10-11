@@ -2,6 +2,16 @@
 Covenantrix Backend Application
 FastAPI application with clean architecture
 """
+import sys
+import os
+from pathlib import Path
+
+# Add backend directory to Python path for embedded Python distributions
+# This ensures imports work regardless of how the application is executed
+backend_dir = Path(__file__).parent.resolve()
+if str(backend_dir) not in sys.path:
+    sys.path.insert(0, str(backend_dir))
+
 import logging
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
