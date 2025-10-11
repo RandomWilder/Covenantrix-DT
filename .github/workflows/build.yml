@@ -206,16 +206,19 @@ jobs:
         echo "Testing Backend Startup"
         echo "=========================================="
         
-        cd backend
+        # Set PYTHONPATH to include backend directory
+        export PYTHONPATH="${GITHUB_WORKSPACE}/backend:${PYTHONPATH}"
+        
         if [ "${{ matrix.os }}" == "windows-latest" ]; then
-          ../dist/python-dist/python.exe main.py &
+          # Windows: Run from repo root with proper path
+          dist/python-dist/python.exe backend/main.py &
         else
-          ../dist/python-dist/bin/python main.py &
+          # macOS: Run from repo root with proper path
+          dist/python-dist/bin/python backend/main.py &
         fi
         
         BACKEND_PID=$!
         echo "Backend started with PID: $BACKEND_PID"
-        cd ..
         
         echo "Waiting for backend to start (max 30 seconds)..."
         for i in {1..30}; do
@@ -225,6 +228,10 @@ jobs:
           fi
           if [ $i -eq 30 ]; then
             echo "Backend failed to start within 30 seconds"
+            echo "Checking for backend process..."
+            ps aux | grep python || true
+            echo "Last few lines of backend output (if any):"
+            kill -0 $BACKEND_PID 2>/dev/null && echo "Backend process still running" || echo "Backend process died"
             kill $BACKEND_PID 2>/dev/null || true
             exit 1
           fi
