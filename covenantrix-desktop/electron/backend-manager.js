@@ -31,38 +31,31 @@ class BackendManager {
       };
     }
 
-    // In production, use bundled executable
+    // In production, use bundled Python + source
     const resourcesPath = process.resourcesPath;
     const backendDir = path.join(resourcesPath, 'backend');
+    const pythonDistPath = path.join(resourcesPath, 'python-dist');
     
-    let executableName;
+    let pythonExecutable;
     if (process.platform === 'win32') {
-      executableName = 'main.exe';
-    } else if (process.platform === 'darwin') {
-      executableName = 'main';
+      pythonExecutable = path.join(pythonDistPath, 'python.exe');
     } else {
-      executableName = 'main';
+      pythonExecutable = path.join(pythonDistPath, 'bin', 'python');
     }
-
-    const executablePath = path.join(backendDir, executableName);
     
-    // Verify executable exists
-    if (!fs.existsSync(executablePath)) {
-      throw new Error(`Backend executable not found at: ${executablePath}`);
+    // Verify Python executable exists
+    if (!fs.existsSync(pythonExecutable)) {
+      throw new Error(`Python executable not found at: ${pythonExecutable}`);
     }
 
-    // Make executable on Unix systems
-    if (process.platform !== 'win32') {
-      try {
-        fs.chmodSync(executablePath, '755');
-      } catch (error) {
-        log.warn(`Failed to set executable permissions: ${error.message}`);
-      }
+    // Verify backend directory exists
+    if (!fs.existsSync(backendDir)) {
+      throw new Error(`Backend directory not found at: ${backendDir}`);
     }
 
     return {
-      executable: executablePath,
-      args: [],
+      executable: pythonExecutable,
+      args: ['main.py'],
       cwd: backendDir
     };
   }

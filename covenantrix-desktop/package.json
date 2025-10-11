@@ -1,6 +1,6 @@
 {
   "name": "covenantrix-desktop",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "description": "Covenantrix - RAG-powered Document Intelligence Desktop App",
   "main": "electron/main.js",
   "homepage": "https://github.com/RandomWilder/Covenantrix-DT",
@@ -94,8 +94,21 @@
     ],
     "extraResources": [
       {
-        "from": "backend",
+        "from": "../backend",
         "to": "backend",
+        "filter": [
+          "**/*",
+          "!**/__pycache__/**",
+          "!**/*.pyc",
+          "!**/*.pyo",
+          "!**/tests/**",
+          "!**/.pytest_cache/**",
+          "!main.spec"
+        ]
+      },
+      {
+        "from": "../dist/python-dist",
+        "to": "python-dist",
         "filter": [
           "**/*"
         ]

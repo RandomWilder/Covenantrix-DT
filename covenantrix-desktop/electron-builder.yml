@@ -18,14 +18,25 @@ files:
   - "!*.config.{js,ts}"
 
 extraResources:
-  - from: backend
+  - from: ../backend
     to: backend
+    filter:
+      - "**/*"
+      - "!**/__pycache__/**"
+      - "!**/*.pyc"
+      - "!**/*.pyo"
+      - "!**/tests/**"
+      - "!**/.pytest_cache/**"
+      - "!main.spec"
+  - from: ../dist/python-dist
+    to: python-dist
     filter:
       - "**/*"
 
 asarUnpack:
   - "resources/**"
   - "backend/**"
+  - "python-dist/**"
 
 win:
   target:

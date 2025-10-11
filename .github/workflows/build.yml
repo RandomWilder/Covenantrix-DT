@@ -206,14 +206,16 @@ jobs:
         echo "Testing Backend Startup"
         echo "=========================================="
         
+        cd backend
         if [ "${{ matrix.os }}" == "windows-latest" ]; then
-          dist/python-dist/python.exe backend/main.py &
+          ../dist/python-dist/python.exe main.py &
         else
-          dist/python-dist/bin/python backend/main.py &
+          ../dist/python-dist/bin/python main.py &
         fi
         
         BACKEND_PID=$!
         echo "Backend started with PID: $BACKEND_PID"
+        cd ..
         
         echo "Waiting for backend to start (max 30 seconds)..."
         for i in {1..30}; do
