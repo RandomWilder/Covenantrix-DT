@@ -85,7 +85,12 @@ jobs:
         echo "Configuring Python environment..."
         echo "import sys; import os; sys.path.append(os.path.join(os.path.dirname(__file__), 'Lib', 'site-packages'))" > dist/python-dist/sitecustomize.py
         
-        sed -i 's/#import site/import site/' dist/python-dist/python311._pth || exit 1
+        # Configure python311._pth with all necessary paths
+        echo "python311.zip" > dist/python-dist/python311._pth
+        echo "." >> dist/python-dist/python311._pth
+        echo "./Lib" >> dist/python-dist/python311._pth
+        echo "./Lib/site-packages" >> dist/python-dist/python311._pth
+        echo "import site" >> dist/python-dist/python311._pth
         
         mkdir -p dist/python-dist/Lib/site-packages
         
@@ -110,15 +115,44 @@ jobs:
         echo "=========================================="
         echo "Creating macOS Python Distribution"
         echo "=========================================="
-        python3 -m venv dist/python-dist
-        source dist/python-dist/bin/activate
         
-        pip install --upgrade pip
+        # Create distribution directory
+        mkdir -p dist/python-dist
         
-        echo "Installing packages from requirements.txt..."
-        pip install -r backend/requirements.txt
+        # Download Python standalone build
+        # Detect architecture (GitHub Actions macOS runners are x86_64)
+        ARCH=$(uname -m)
+        if [ "$ARCH" = "arm64" ] || [ "$ARCH" = "aarch64" ]; then
+          PYTHON_ARCH="aarch64"
+        else
+          PYTHON_ARCH="x86_64"
+        fi
         
-        find dist/python-dist -name "*.py" -type f -exec sed -i '' 's|'"$(pwd)"'/dist/python-dist|.|g' {} \; 2>/dev/null || true
+        echo "Downloading Python standalone build for macOS (${PYTHON_ARCH})..."
+        curl -L -o python-macos.tar.gz "https://github.com/indygreg/python-build-standalone/releases/download/20231002/cpython-3.11.6+20231002-${PYTHON_ARCH}-apple-darwin-install_only.tar.gz" || exit 1
+        
+        echo "Extracting Python..."
+        tar -xzf python-macos.tar.gz -C dist/python-dist --strip-components=1 || exit 1
+        
+        echo "Extracted contents:"
+        ls -la dist/python-dist/
+        
+        # Verify Python executable
+        if [ ! -f "dist/python-dist/bin/python3" ]; then
+          echo "CRITICAL ERROR: Python executable not found after extraction"
+          exit 1
+        fi
+        
+        # Create symlink for convenience
+        ln -sf python3 dist/python-dist/bin/python
+        echo "Created python symlink"
+        
+        echo "Installing pip..."
+        curl -L https://bootstrap.pypa.io/get-pip.py -o get-pip.py || exit 1
+        dist/python-dist/bin/python3 get-pip.py || exit 1
+        
+        echo "Installing required packages..."
+        dist/python-dist/bin/python3 -m pip install -r backend/requirements.txt || exit 1
         
         echo "macOS Python distribution created successfully"
         
@@ -206,17 +240,14 @@ jobs:
         echo "Testing Backend Startup"
         echo "=========================================="
         
-        # Set PYTHONPATH to include backend directory
-        export PYTHONPATH="${GITHUB_WORKSPACE}/backend:${PYTHONPATH}"
-        
-        # Change to backend directory before running
+        # Change to backend directory (matches production backend-manager.js line 59)
         cd backend
         
         if [ "${{ matrix.os }}" == "windows-latest" ]; then
-          # Windows: Run Python from dist, but execute main.py from backend dir
+          # Windows: Run Python from dist with main.py
           ../dist/python-dist/python.exe main.py &
         else
-          # macOS: Run Python from dist, but execute main.py from backend dir
+          # macOS: Run Python from dist with main.py
           ../dist/python-dist/bin/python main.py &
         fi
         
@@ -274,6 +305,59 @@ jobs:
       env:
         GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         
+    - name: Verify Packaged App Structure
+      shell: bash
+      run: |
+        echo "=========================================="
+        echo "Verifying Packaged App Structure"
+        echo "=========================================="
+        
+        if [ "${{ matrix.os }}" == "windows-latest" ]; then
+          echo "Verifying Windows app structure..."
+          
+          # Check unpacked directory
+          if [ -d "covenantrix-desktop/dist/release/win-unpacked" ]; then
+            echo "Found unpacked Windows app directory"
+            ls -la covenantrix-desktop/dist/release/win-unpacked/resources/
+            
+            # Verify backend and python-dist are packaged
+            if [ ! -d "covenantrix-desktop/dist/release/win-unpacked/resources/backend" ]; then
+              echo "ERROR: Backend directory not found in packaged app"
+              exit 1
+            fi
+            
+            if [ ! -d "covenantrix-desktop/dist/release/win-unpacked/resources/python-dist" ]; then
+              echo "ERROR: Python distribution not found in packaged app"
+              exit 1
+            fi
+            
+            echo "✓ Backend and Python distribution correctly packaged"
+          else
+            echo "Note: Unpacked directory not found (packed into installer)"
+          fi
+          
+        else
+          echo "Verifying macOS app structure..."
+          
+          # For macOS, the resources are inside the .app bundle in the DMG
+          # Verify DMG exists and has reasonable size
+          if ls covenantrix-desktop/dist/release/*.dmg 1> /dev/null 2>&1; then
+            DMG_SIZE=$(du -m covenantrix-desktop/dist/release/*.dmg | cut -f1)
+            echo "DMG size: ${DMG_SIZE}MB"
+            
+            # DMG should be at least 100MB with Python + backend
+            if [ "$DMG_SIZE" -lt 100 ]; then
+              echo "WARNING: DMG seems too small, may be missing components"
+            else
+              echo "✓ DMG size looks reasonable"
+            fi
+          else
+            echo "WARNING: No DMG file found"
+          fi
+        fi
+        
+        echo "=========================================="
+        
     - name: List Build Output
       shell: bash
       run: |
@@ -285,6 +369,38 @@ jobs:
         echo ""
         echo "Build artifacts:"
         find covenantrix-desktop/dist/release/ -type f \( -name "*.exe" -o -name "*.dmg" -o -name "*.AppImage" -o -name "*.yml" \) 2>/dev/null || echo "No artifacts found"
+        echo "=========================================="
+        
+    - name: Verify Artifacts Before Upload
+      shell: bash
+      run: |
+        echo "=========================================="
+        echo "Verifying Build Artifacts"
+        echo "=========================================="
+        
+        echo "Checking for build artifacts in dist/release/..."
+        ls -la covenantrix-desktop/dist/release/
+        
+        if [ "${{ matrix.os }}" == "windows-latest" ]; then
+          echo "Looking for Windows installer (.exe)..."
+          if ! ls covenantrix-desktop/dist/release/*.exe 1> /dev/null 2>&1; then
+            echo "ERROR: No Windows installer (.exe) found"
+            exit 1
+          fi
+          echo "✓ Windows installer found"
+          
+        elif [ "${{ matrix.os }}" == "macos-latest" ]; then
+          echo "Looking for macOS installer (.dmg)..."
+          if ! ls covenantrix-desktop/dist/release/*.dmg 1> /dev/null 2>&1; then
+            echo "ERROR: No macOS installer (.dmg) found"
+            exit 1
+          fi
+          echo "✓ macOS installer found"
+        fi
+        
+        echo "Checking for update metadata files..."
+        ls -la covenantrix-desktop/dist/release/latest*.yml 2>/dev/null || echo "Note: No update metadata files found (may be generated separately)"
+        
         echo "=========================================="
         
     - name: Upload Build Artifacts
@@ -333,10 +449,15 @@ jobs:
         echo "Preparing release files..."
         mkdir -p release-files
         
-        find artifacts/ -name "*Setup*.exe" -exec cp {} release-files/ \; 2>/dev/null || echo "No .exe installers found"
+        # Copy all installers (use *.exe to catch all Windows installers)
+        find artifacts/ -name "*.exe" -type f -exec cp {} release-files/ \; 2>/dev/null || echo "No .exe installers found"
         find artifacts/ -name "*.dmg" -exec cp {} release-files/ \; 2>/dev/null || echo "No .dmg files found"
         find artifacts/ -name "*.AppImage" -exec cp {} release-files/ \; 2>/dev/null || echo "No .AppImage files found"
         find artifacts/ -name "latest*.yml" -exec cp {} release-files/ \; 2>/dev/null || echo "No metadata files found"
+        
+        echo ""
+        echo "Verifying update metadata files..."
+        ls -la release-files/latest*.yml 2>/dev/null || echo "WARNING: No update metadata files found"
         
         echo ""
         echo "Release files prepared:"

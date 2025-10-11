@@ -4,7 +4,7 @@ copyright: Copyright © 2025 ${author}
 
 directories:
   buildResources: build
-  output: dist
+  output: dist/release
 
 files:
   - "dist-electron/**/*"
