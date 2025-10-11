@@ -206,15 +206,15 @@ jobs:
         echo "Testing Backend Startup"
         echo "=========================================="
         
-        # Set PYTHONPATH to include backend directory
-        export PYTHONPATH="${GITHUB_WORKSPACE}/backend:${PYTHONPATH}"
+        # Change to backend directory before running
+        cd backend
         
         if [ "${{ matrix.os }}" == "windows-latest" ]; then
-          # Windows: Run from repo root with proper path
-          dist/python-dist/python.exe backend/main.py &
+          # Windows: Run Python from dist, but execute main.py from backend dir
+          ../dist/python-dist/python.exe main.py &
         else
-          # macOS: Run from repo root with proper path
-          dist/python-dist/bin/python backend/main.py &
+          # macOS: Run Python from dist, but execute main.py from backend dir
+          ../dist/python-dist/bin/python main.py &
         fi
         
         BACKEND_PID=$!
@@ -254,6 +254,9 @@ jobs:
         echo "Stopping backend..."
         kill $BACKEND_PID 2>/dev/null || true
         sleep 2
+        
+        # Return to repo root for subsequent steps
+        cd ..
         
         echo "Backend test completed successfully"
         echo "=========================================="
