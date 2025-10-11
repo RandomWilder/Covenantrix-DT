@@ -206,6 +206,9 @@ jobs:
         echo "Testing Backend Startup"
         echo "=========================================="
         
+        # Set PYTHONPATH to include backend directory
+        export PYTHONPATH="${GITHUB_WORKSPACE}/backend:${PYTHONPATH}"
+        
         # Change to backend directory before running
         cd backend
         
