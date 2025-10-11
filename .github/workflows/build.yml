@@ -47,7 +47,7 @@ jobs:
       with:
         node-version: '20'
         cache: 'npm'
-        cache-dependency-path: './package-lock.json'
+        cache-dependency-path: 'covenantrix-desktop/package-lock.json'
         
     - name: Setup Python
       uses: actions/setup-python@v5
@@ -55,6 +55,7 @@ jobs:
         python-version: '3.11'
         
     - name: Install Node dependencies
+      working-directory: covenantrix-desktop
       run: npm ci
       
     - name: Create Python Distribution (Windows)
@@ -249,6 +250,7 @@ jobs:
         echo "=========================================="
         
     - name: Build Electron App
+      working-directory: covenantrix-desktop
       run: |
         echo "=========================================="
         echo "Building Electron App for ${{ matrix.platform }}"
@@ -264,10 +266,10 @@ jobs:
         echo "Build Output"
         echo "=========================================="
         echo "Release directory contents:"
-        ls -lah dist/release/ 2>/dev/null || echo "No release directory found"
+        ls -lah covenantrix-desktop/dist/release/ 2>/dev/null || echo "No release directory found"
         echo ""
         echo "Build artifacts:"
-        find dist/release/ -type f \( -name "*.exe" -o -name "*.dmg" -o -name "*.AppImage" -o -name "*.yml" \) 2>/dev/null || echo "No artifacts found"
+        find covenantrix-desktop/dist/release/ -type f \( -name "*.exe" -o -name "*.dmg" -o -name "*.AppImage" -o -name "*.yml" \) 2>/dev/null || echo "No artifacts found"
         echo "=========================================="
         
     - name: Upload Build Artifacts
@@ -275,10 +277,10 @@ jobs:
       with:
         name: covenantrix-${{ matrix.platform }}-${{ matrix.arch }}
         path: |
-          dist/release/*.exe
-          dist/release/*.dmg  
-          dist/release/*.AppImage
-          dist/release/latest*.yml
+          covenantrix-desktop/dist/release/*.exe
+          covenantrix-desktop/dist/release/*.dmg  
+          covenantrix-desktop/dist/release/*.AppImage
+          covenantrix-desktop/dist/release/latest*.yml
         retention-days: 30
         if-no-files-found: error
         
