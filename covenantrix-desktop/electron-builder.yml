@@ -6,7 +6,6 @@ copyright: Copyright © 2025 ${author}
 files:
   - dist/**/*
   - electron/**/*
-  - resources/**/*
   - package.json
   - "!**/*.ts"
   - "!**/*.map"
@@ -23,11 +22,11 @@ files:
 # Use asar for better compression
 asar: true
 asarUnpack:
-  - resources/backend/**/*
+  - resources/**/*
 
 directories:
   buildResources: build
-  output: dist
+  output: dist/release
 
 # Compression for smaller installers
 compression: maximum
@@ -53,7 +52,6 @@ nsis:
   uninstallerIcon: build/icon.ico
   license: LICENSE
   deleteAppDataOnUninstall: true
-  # Compression for smaller installer
   packElevateHelper: false
   perMachine: false
   unicode: true
@@ -68,13 +66,9 @@ mac:
         - universal
   icon: build/icon.icns
   category: public.app-category.productivity
-  hardenedRuntime: true
+  hardenedRuntime: false
   gatekeeperAssess: false
-  entitlements: build/entitlements.mac.plist
-  entitlementsInherit: build/entitlements.mac.plist
   artifactName: ${productName}-${version}.${ext}
-  # Sign for distribution (requires Apple Developer account)
-  # identity: "Developer ID Application: Your Name (TEAM_ID)"
   
 dmg:
   contents:
@@ -85,13 +79,12 @@ dmg:
       type: link
       path: /Applications
   sign: false
-  background: build/background.png
   window:
     width: 540
     height: 380
 
 # ============================================
-# LINUX CONFIGURATION
+# LINUX CONFIGURATION (Optional)
 # ============================================
 linux:
   target:
@@ -101,12 +94,9 @@ linux:
   icon: build/icon.png
   category: Office
   artifactName: ${productName}-${version}.${ext}
-  synopsis: AI-powered document analysis assistant
-  description: Covenantrix is an AI-powered desktop application that helps you analyze and understand your documents using advanced RAG technology.
   
 appImage:
   license: LICENSE
-  synopsis: AI-powered document analysis
   category: Office
 
 # ============================================
@@ -120,7 +110,7 @@ publish:
   publishAutoUpdate: true
 
 # ============================================
-# PROTOCOLS (for deep linking if needed)
+# PROTOCOLS
 # ============================================
 protocols:
   name: covenantrix
@@ -128,7 +118,7 @@ protocols:
     - covenantrix
 
 # ============================================
-# BUILD RESOURCES
+# BACKEND RESOURCES
 # ============================================
 extraResources:
   - from: resources

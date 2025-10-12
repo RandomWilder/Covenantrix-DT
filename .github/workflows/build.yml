@@ -2,62 +2,232 @@ name: Build and Release
 
 on:
   push:
-    tags:
-      - 'v*'
+    tags: ['v*']
+  pull_request:
+    branches: [main]
   workflow_dispatch:
 
-env:
-  PYTHON_VERSION: '3.11'
-  NODE_VERSION: '20'
+permissions:
+  contents: write
+  actions: read
 
 jobs:
-  release:
-    name: Build and Release
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            platform: win
+            python_url: https://www.python.org/ftp/python/3.11.6/python-3.11.6-embed-amd64.zip
+            python_exe: python.exe
+          - os: macos-latest
+            platform: mac
+            python_exe: bin/python3
+            
     runs-on: ${{ matrix.os }}
     
-    strategy:
-      matrix:
-        os: [windows-latest, macos-latest, ubuntu-latest]
-
     steps:
-      - name: Checkout code
+      - name: Checkout
         uses: actions/checkout@v4
-
-      - name: Setup Node.js
+      
+      - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: ${{ env.NODE_VERSION }}
+          node-version: '20'
           cache: 'npm'
           cache-dependency-path: covenantrix-desktop/package-lock.json
-
-      - name: Setup Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: ${{ env.PYTHON_VERSION }}
-
-      - name: Build Python Backend
-        working-directory: backend
-        shell: bash
-        run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt pyinstaller
-          pyinstaller main.spec
-
-      - name: Prepare Backend for Packaging
-        shell: bash
-        run: |
-          mkdir -p covenantrix-desktop/resources/backend
-          cp -r backend/dist/* covenantrix-desktop/resources/backend/
-          if [ "${{ runner.os }}" != "Windows" ]; then
-            chmod +x covenantrix-desktop/resources/backend/backend
-          fi
-
-      - name: Install Frontend Dependencies
+          
+      - name: Install frontend dependencies
         working-directory: covenantrix-desktop
         run: npm ci
-
-      - name: Build and Release Electron App
+      
+      # === PYTHON DISTRIBUTION (WINDOWS) ===
+      
+      - name: Create Python Distribution (Windows)
+        if: matrix.os == 'windows-latest'
+        shell: bash
+        run: |
+          set -e
+          echo "Creating Windows Python distribution..."
+          mkdir -p dist/python-dist
+          
+          # Download embedded Python
+          curl -L -o python-embed.zip ${{ matrix.python_url }} || exit 1
+          unzip -q python-embed.zip -d dist/python-dist/ || exit 1
+          
+          # Verify
+          test -f dist/python-dist/python.exe || exit 1
+          
+          # Enable site-packages
+          echo "import sys; import os; sys.path.append(os.path.join(os.path.dirname(__file__), 'Lib', 'site-packages'))" > dist/python-dist/sitecustomize.py
+          sed -i 's/#import site/import site/' dist/python-dist/python311._pth
+          
+          # Setup directories
+          mkdir -p dist/python-dist/Lib/site-packages
+          
+          # Install pip
+          curl -L https://bootstrap.pypa.io/get-pip.py -o get-pip.py || exit 1
+          dist/python-dist/python.exe get-pip.py --target dist/python-dist/Lib/site-packages --no-warn-script-location || exit 1
+          
+          # Install packages
+          dist/python-dist/python.exe -m pip install --target dist/python-dist/Lib/site-packages --no-warn-script-location -r backend/requirements.txt || exit 1
+          
+          echo "✅ Windows Python distribution created"
+          
+      # === PYTHON DISTRIBUTION (MACOS) ===
+      
+      - name: Create Python Distribution (macOS)
+        if: matrix.os == 'macos-latest'
+        run: |
+          echo "Creating macOS Python distribution..."
+          python3 -m venv dist/python-dist
+          source dist/python-dist/bin/activate
+          
+          pip install --upgrade pip || exit 1
+          pip install -r backend/requirements.txt || exit 1
+          
+          # Create python symlink
+          ln -sf python3 dist/python-dist/bin/python
+          
+          echo "✅ macOS Python distribution created"
+      
+      # === VERIFICATION ===
+      
+      - name: Verify Python Distribution
+        shell: bash
+        run: |
+          echo "=== Verifying Python Distribution ==="
+          
+          if [ "${{ matrix.os }}" == "windows-latest" ]; then
+            PYTHON_CMD="dist/python-dist/python.exe"
+          else
+            PYTHON_CMD="dist/python-dist/bin/python"
+          fi
+          
+          # Test Python
+          $PYTHON_CMD --version || exit 1
+          
+          # Test critical imports
+          $PYTHON_CMD -c "import fastapi; print('✓ FastAPI')" || exit 1
+          $PYTHON_CMD -c "import uvicorn; print('✓ Uvicorn')" || exit 1
+          $PYTHON_CMD -c "import pydantic; print('✓ Pydantic')" || exit 1
+          $PYTHON_CMD -c "import openai; print('✓ OpenAI')" || exit 1
+          
+          echo "✅ All imports successful"
+      
+      - name: Test Backend
+        shell: bash
+        run: |
+          echo "=== Testing Backend ==="
+          
+          if [ "${{ matrix.os }}" == "windows-latest" ]; then
+            PYTHON_CMD="dist/python-dist/python.exe"
+          else
+            PYTHON_CMD="dist/python-dist/bin/python"
+          fi
+          
+          # Start backend in background
+          cd backend
+          ../$PYTHON_CMD main.py &
+          BACKEND_PID=$!
+          cd ..
+          
+          echo "Backend PID: $BACKEND_PID"
+          
+          # Wait for startup
+          for i in {1..30}; do
+            if curl -s http://127.0.0.1:8000/health > /dev/null 2>&1; then
+              echo "✅ Backend responding"
+              break
+            fi
+            echo "Waiting... ($i/30)"
+            sleep 2
+          done
+          
+          # Test health endpoint
+          curl -f http://127.0.0.1:8000/health || exit 1
+          
+          # Cleanup
+          kill $BACKEND_PID || true
+          sleep 2
+          
+          echo "✅ Backend test passed"
+      
+      # === PREPARE RESOURCES ===
+      
+      - name: Prepare Backend Resources
+        shell: bash
+        run: |
+          echo "=== Preparing Backend Resources ==="
+          mkdir -p covenantrix-desktop/resources/backend
+          mkdir -p covenantrix-desktop/resources/python-dist
+          
+          # Copy backend source
+          cp -r backend/* covenantrix-desktop/resources/backend/
+          
+          # Copy Python distribution
+          cp -r dist/python-dist/* covenantrix-desktop/resources/python-dist/
+          
+          # Verify
+          ls -la covenantrix-desktop/resources/
+          echo "✅ Resources prepared"
+      
+      # === BUILD ELECTRON ===
+      
+      - name: Build Electron App
         working-directory: covenantrix-desktop
-        run: npm run release
+        run: npm run build
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          
+      - name: List Build Output
+        shell: bash
+        run: |
+          echo "=== Build Output ==="
+          ls -la covenantrix-desktop/dist/release/ || echo "No release directory"
+          find covenantrix-desktop/dist/release/ -type f \( -name "*.exe" -o -name "*.dmg" \) || echo "No installers"
+          
+      - name: Upload Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: covenantrix-${{ matrix.platform }}
+          path: |
+            covenantrix-desktop/dist/release/*.exe
+            covenantrix-desktop/dist/release/*.dmg
+            covenantrix-desktop/dist/release/latest*.yml
+          retention-days: 30
+          if-no-files-found: error
+
+  # === RELEASE ===
+  
+  release:
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    
+    steps:
+      - name: Download Artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts/
+          
+      - name: Prepare Release Files
+        run: |
+          mkdir -p release-files
+          find artifacts/ -name "*.exe" -exec cp {} release-files/ \;
+          find artifacts/ -name "*.dmg" -exec cp {} release-files/ \;
+          find artifacts/ -name "latest*.yml" -exec cp {} release-files/ \;
+          ls -la release-files/
+          
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: release-files/*
+          draft: false
+          prerelease: false
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
