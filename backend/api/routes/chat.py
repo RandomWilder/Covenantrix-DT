@@ -37,6 +37,15 @@ async def send_message(
     Returns:
         Chat response with assistant message and sources
     """
+    # Pre-operation global state check (DO NOT re-resolve keys)
+    from core.dependencies import get_rag_engine
+    if get_rag_engine() is None:
+        logger.warning("Chat message blocked - no valid OpenAI API key configured")
+        raise HTTPException(
+            status_code=400,
+            detail="No valid OpenAI API key configured. Please configure your API key in Settings to start chatting."
+        )
+    
     try:
         response = await service.send_message(
             message=request.message,
@@ -89,6 +98,15 @@ async def send_message_stream(
     Returns:
         Server-Sent Events stream with token-by-token response
     """
+    # Pre-operation global state check (DO NOT re-resolve keys)
+    from core.dependencies import get_rag_engine
+    if get_rag_engine() is None:
+        logger.warning("Chat streaming blocked - no valid OpenAI API key configured")
+        raise HTTPException(
+            status_code=400,
+            detail="No valid OpenAI API key configured. Please configure your API key in Settings to start chatting."
+        )
+    
     async def generate_stream():
         """Generate SSE stream"""
         try:

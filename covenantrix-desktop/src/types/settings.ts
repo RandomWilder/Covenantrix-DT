@@ -3,6 +3,8 @@
  * User preferences and API key configuration
  */
 
+import type { ServiceStatus } from './services';
+
 export type ApiKeyMode = 'default' | 'custom';
 export type SearchMode = 'naive' | 'local' | 'global' | 'hybrid';
 export type Language = 'en' | 'es' | 'fr' | 'he' | 'de';
@@ -53,11 +55,32 @@ export interface UserSettings {
   last_updated?: string;
 }
 
+export interface ValidationError {
+  field: string;
+  message: string;
+  type: string;
+}
+
+export interface SettingsError {
+  message: string;
+  validationErrors?: ValidationError[];
+}
+
+export interface KeyStatusResponse {
+  has_valid_key: boolean;
+  mode: ApiKeyMode | null;
+  message: string;
+}
+
 export interface SettingsContextValue {
   settings: UserSettings | null;
   isLoading: boolean;
+  error: SettingsError | null;
+  serviceStatus: ServiceStatus | null;
   updateSettings: (updates: Partial<UserSettings>) => Promise<void>;
   resetSettings: () => Promise<void>;
   validateApiKeys: () => Promise<boolean>;
   applySettings: () => Promise<void>;
+  fetchServiceStatus: () => Promise<void>;
+  clearError: () => void;
 }

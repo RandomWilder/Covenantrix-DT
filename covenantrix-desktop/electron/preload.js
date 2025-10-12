@@ -15,6 +15,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   updateSettings: (settings) => ipcRenderer.invoke('update-settings', settings),
   validateApiKeys: (apiKeys) => ipcRenderer.invoke('validate-api-keys', apiKeys),
   applySettings: (settings) => ipcRenderer.invoke('apply-settings', settings),
+  getKeyStatus: () => ipcRenderer.invoke('get-key-status'),
+  getServicesStatus: () => ipcRenderer.invoke('services:status'),
   
   // Zoom level management
   setZoomLevel: (zoomLevel) => ipcRenderer.invoke('set-zoom-level', zoomLevel),

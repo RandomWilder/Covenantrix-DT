@@ -45,6 +45,15 @@ async def upload_document(
     Returns:
         Upload confirmation with document ID
     """
+    # Pre-operation global state check (DO NOT re-resolve keys)
+    from core.dependencies import get_rag_engine
+    if get_rag_engine() is None:
+        logger.warning("Document upload blocked - no valid OpenAI API key configured")
+        raise HTTPException(
+            status_code=400,
+            detail="No valid OpenAI API key configured. Please configure your API key in Settings to upload documents."
+        )
+    
     try:
         # Validate file
         if not file.filename:
@@ -115,6 +124,15 @@ async def upload_documents_stream(
     Returns:
         Server-Sent Events stream with progress updates
     """
+    # Pre-operation global state check (DO NOT re-resolve keys)
+    from core.dependencies import get_rag_engine
+    if get_rag_engine() is None:
+        logger.warning("Batch document upload blocked - no valid OpenAI API key configured")
+        raise HTTPException(
+            status_code=400,
+            detail="No valid OpenAI API key configured. Please configure your API key in Settings to upload documents."
+        )
+    
     # CRITICAL: Read all file contents BEFORE creating the generator
     # FastAPI closes UploadFile objects when the route function returns,
     # so we must read them before returning StreamingResponse

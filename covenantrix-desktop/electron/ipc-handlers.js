@@ -418,25 +418,56 @@ ipcMain.handle('update-settings', async (event, settingsData) => {
     
     console.log('Updating settings:', { api_keys, settings })
     
-    // Save to secure store
-    secureStore.set('settings', settings)
-    secureStore.set('apiKeys', api_keys)
-    secureStore.set('lastUpdated', new Date().toISOString())
-    
-    // Forward to backend API
+    // Forward to backend API first to validate
     try {
       const backendUrl = 'http://127.0.0.1:8000/settings'
-      await axios.post(backendUrl, {
+      const response = await axios.post(backendUrl, {
         settings: settingsData
       })
+      
+      // If backend validation succeeds, save to local store
+      secureStore.set('settings', settings)
+      secureStore.set('apiKeys', api_keys)
+      secureStore.set('lastUpdated', new Date().toISOString())
+      
+      return {
+        success: true,
+        message: 'Settings updated successfully',
+        settings: response.data.settings
+      }
     } catch (backendError) {
-      console.warn('Failed to sync with backend:', backendError.message)
-      // Continue even if backend sync fails
-    }
-    
-    return {
-      success: true,
-      message: 'Settings updated successfully'
+      console.error('Backend validation failed:', backendError.message)
+      
+      // Extract validation error details if available
+      let errorMessage = 'Failed to validate settings'
+      let validationErrors = null
+      
+      if (backendError.response) {
+        const status = backendError.response.status
+        const data = backendError.response.data
+        
+        if (status === 422 && data.detail) {
+          // Pydantic validation error
+          if (Array.isArray(data.detail)) {
+            validationErrors = data.detail.map(err => ({
+              field: err.loc ? err.loc.join('.') : 'unknown',
+              message: err.msg,
+              type: err.type
+            }))
+            errorMessage = validationErrors.map(e => `${e.field}: ${e.message}`).join('; ')
+          } else {
+            errorMessage = data.detail
+          }
+        } else if (data.detail) {
+          errorMessage = typeof data.detail === 'string' ? data.detail : JSON.stringify(data.detail)
+        }
+      }
+      
+      return {
+        success: false,
+        error: errorMessage,
+        validationErrors: validationErrors
+      }
     }
   } catch (error) {
     console.error('Failed to update settings:', error)
@@ -502,6 +533,56 @@ ipcMain.handle('get-default-settings', async (event) => {
       success: false,
       error: error.message,
       settings: null
+    }
+  }
+})
+
+ipcMain.handle('get-key-status', async (event) => {
+  try {
+    const backendUrl = 'http://127.0.0.1:8000/settings/key-status'
+    const response = await axios.get(backendUrl)
+    
+    return {
+      success: true,
+      ...response.data
+    }
+  } catch (error) {
+    console.error('Failed to get key status:', error)
+    return {
+      success: false,
+      error: error.message,
+      has_valid_key: false,
+      mode: null,
+      message: 'Failed to check key status'
+    }
+  }
+})
+
+ipcMain.handle('services:status', async (event) => {
+  try {
+    const backendUrl = 'http://127.0.0.1:8000/services/status'
+    const response = await axios.get(backendUrl)
+    
+    return {
+      success: true,
+      data: response.data
+    }
+  } catch (error) {
+    console.error('Failed to get services status:', error)
+    return {
+      success: false,
+      error: error.message,
+      data: {
+        openai_available: false,
+        cohere_available: false,
+        google_available: false,
+        features: {
+          chat: false,
+          upload: false,
+          reranking: false,
+          ocr: false
+        }
+      }
     }
   }
 })

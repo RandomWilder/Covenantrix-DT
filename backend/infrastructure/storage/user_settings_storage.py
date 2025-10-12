@@ -49,6 +49,9 @@ class UserSettingsStorage:
             # Handle settings migration if needed
             data = await self._migrate_settings(data)
             
+            # Decrypt sensitive data (API keys)
+            data = await self._decrypt_sensitive_data(data)
+            
             # Create settings object
             settings = UserSettings(**data)
             
@@ -211,20 +214,33 @@ class UserSettingsStorage:
             if settings_dict.get("api_keys", {}).get("mode") == "custom":
                 api_keys = settings_dict["api_keys"]
                 
+                # Decrypt OpenAI key
                 if api_keys.get("openai"):
-                    api_keys["openai"] = self.api_key_manager.decrypt_key(api_keys["openai"])
+                    try:
+                        api_keys["openai"] = self.api_key_manager.decrypt_key(api_keys["openai"])
+                    except Exception as e:
+                        logger.warning(f"Failed to decrypt OpenAI key, assuming plain text: {e}")
+                        # Key is already plain text or invalid - leave as is
                 
+                # Decrypt Cohere key
                 if api_keys.get("cohere"):
-                    api_keys["cohere"] = self.api_key_manager.decrypt_key(api_keys["cohere"])
+                    try:
+                        api_keys["cohere"] = self.api_key_manager.decrypt_key(api_keys["cohere"])
+                    except Exception as e:
+                        logger.warning(f"Failed to decrypt Cohere key, assuming plain text: {e}")
                 
+                # Decrypt Google key
                 if api_keys.get("google"):
-                    api_keys["google"] = self.api_key_manager.decrypt_key(api_keys["google"])
+                    try:
+                        api_keys["google"] = self.api_key_manager.decrypt_key(api_keys["google"])
+                    except Exception as e:
+                        logger.warning(f"Failed to decrypt Google key, assuming plain text: {e}")
             
             return settings_dict
             
         except Exception as e:
             logger.error(f"Failed to decrypt sensitive data: {e}")
-            # Return encrypted data if decryption fails
+            # Return data as-is if decryption fails
             return settings_dict
     
     async def backup_settings(self, backup_path: Optional[Path] = None) -> Path:

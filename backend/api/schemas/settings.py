@@ -2,7 +2,7 @@
 Settings API Schemas
 User settings and configuration management
 """
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 from typing import Optional, Literal
 from enum import Enum
 
@@ -51,13 +51,24 @@ class ApiKeySettings(BaseModel):
     cohere: Optional[str] = Field(default=None, description="Cohere API key (custom mode only)")
     google: Optional[str] = Field(default=None, description="Google Cloud API key (custom mode only)")
 
-    @field_validator("openai", "cohere", "google")
-    @classmethod
-    def validate_custom_keys(cls, v, info):
+    @model_validator(mode='after')
+    def validate_custom_keys(self) -> 'ApiKeySettings':
         """Validate that custom keys are only provided in custom mode"""
-        if v is not None and info.data.get("mode") == "default":
-            raise ValueError("Custom API keys can only be set in custom mode")
-        return v
+        if self.mode == ApiKeyMode.DEFAULT:
+            # In default mode, custom keys should not be provided
+            if self.openai is not None or self.cohere is not None or self.google is not None:
+                raise ValueError(
+                    "Custom API keys cannot be provided in default mode. "
+                    "Please switch to custom mode to use custom API keys."
+                )
+        elif self.mode == ApiKeyMode.CUSTOM:
+            # In custom mode, at least one key should be provided
+            if self.openai is None and self.cohere is None and self.google is None:
+                raise ValueError(
+                    "At least one API key must be provided in custom mode. "
+                    "Please provide OpenAI, Cohere, or Google Cloud API key."
+                )
+        return self
 
 
 class RAGSettings(BaseModel):

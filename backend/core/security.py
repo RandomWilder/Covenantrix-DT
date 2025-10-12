@@ -89,11 +89,16 @@ class APIKeyManager:
     def decrypt_key(self, encrypted_key: str) -> str:
         """Decrypt API key"""
         try:
+            if not encrypted_key:
+                raise ValueError("Empty encrypted key provided")
+            
             decoded = base64.urlsafe_b64decode(encrypted_key.encode())
             decrypted = self.cipher.decrypt(decoded)
             return decrypted.decode()
         except Exception as e:
-            raise ValueError(f"Failed to decrypt API key: {str(e)}")
+            import traceback
+            error_details = traceback.format_exc()
+            raise ValueError(f"Failed to decrypt API key: {str(e)} | Details: {error_details}")
     
     def encrypt_settings(self, settings: Dict[str, Any]) -> str:
         """Encrypt settings dictionary"""

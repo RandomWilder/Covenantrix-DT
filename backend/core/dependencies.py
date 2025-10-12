@@ -37,15 +37,67 @@ _external_data_service: Optional[ExternalDataService] = None
 _ocr_service: Optional[OCRService] = None
 
 
-def set_rag_engine(rag_engine: RAGEngine) -> None:
+def set_rag_engine(rag_engine: Optional[RAGEngine]) -> None:
     """
     Set global RAG engine instance (called from main.py during startup)
     
     Args:
-        rag_engine: Initialized RAG engine instance
+        rag_engine: Initialized RAG engine instance or None if unavailable
     """
     global _rag_engine_instance
     _rag_engine_instance = rag_engine
+
+
+def rag_engine_available() -> bool:
+    """
+    Check if RAG engine is available (non-blocking check)
+    
+    Returns:
+        bool: True if RAG engine is initialized and available
+    """
+    global _rag_engine_instance
+    return _rag_engine_instance is not None
+
+
+def reranker_available() -> bool:
+    """
+    Check if Cohere reranker is available (non-blocking check)
+    
+    Returns:
+        bool: True if Cohere is configured in RAG engine
+    """
+    global _rag_engine_instance
+    if _rag_engine_instance is None:
+        return False
+    
+    try:
+        # Check if RAG engine has reranker configured
+        return hasattr(_rag_engine_instance, 'reranker') and _rag_engine_instance.reranker is not None
+    except Exception as e:
+        logger.error(f"Error checking reranker availability: {e}")
+        return False
+
+
+def ocr_service_available() -> bool:
+    """
+    Check if OCR service is available (non-blocking check)
+    
+    Returns:
+        bool: True if OCR service is initialized and available
+    """
+    global _ocr_service
+    return _ocr_service is not None
+
+
+def set_ocr_service(ocr_service: Optional[OCRService]) -> None:
+    """
+    Set global OCR service instance
+    
+    Args:
+        ocr_service: Initialized OCR service instance or None if unavailable
+    """
+    global _ocr_service
+    _ocr_service = ocr_service
 
 
 # Settings dependency
@@ -122,33 +174,18 @@ def get_rag_engine() -> RAGEngine:
 def get_ocr_service(
     settings: Settings = Depends(get_config)
 ) -> Optional[OCRService]:
-    """Get OCR service instance (singleton)"""
+    """
+    Get OCR service instance (singleton)
+    Returns global OCR service set during startup
+    """
     global _ocr_service
-    if _ocr_service is None:
-        # Initialize OCR service with Google Vision API key from global settings
-        # This follows the same pattern as RAG engine - uses global config by default
-        api_key = settings.google_vision.api_key
-        if api_key and settings.google_vision.enabled and settings.ocr.enabled:
-            try:
-                _ocr_service = OCRService(
-                    api_key=api_key,
-                    user_settings={
-                        "ocr_min_confidence": settings.ocr.min_confidence,
-                        "ocr_min_char_count": settings.ocr.min_char_count,
-                        "preferred_language": settings.ocr.preferred_language
-                    }
-                )
-            except Exception as e:
-                logger.error(f"Failed to initialize OCR service: {e}")
-                _ocr_service = None
-        else:
-            _ocr_service = None
     return _ocr_service
 
 
 def update_ocr_service_with_user_settings(user_settings: dict) -> None:
     """
-    Update OCR service with user settings (similar to RAG engine pattern)
+    Update OCR service with user settings using strict mode resolution
+    Uses api_key_resolver for consistent key resolution (no fallback between modes)
     
     Args:
         user_settings: User settings dictionary
@@ -156,32 +193,36 @@ def update_ocr_service_with_user_settings(user_settings: dict) -> None:
     global _ocr_service
     
     try:
-        # Get API key from user settings if in custom mode
-        api_keys = user_settings.get("api_keys", {})
-        api_key = None
+        from core.api_key_resolver import get_api_key_resolver
         
-        if api_keys.get("mode") == "custom" and api_keys.get("google"):
-            api_key = api_keys["google"]
-        else:
-            # Fall back to global settings
-            settings = get_settings()
-            api_key = settings.google_vision.api_key
+        # Resolve Google API key using strict mode (no cross-mode fallback)
+        api_key_resolver = get_api_key_resolver()
+        settings = get_settings()
+        
+        resolved_google_key = api_key_resolver.resolve_google_key(
+            user_settings=user_settings,
+            fallback_key=settings.google_vision.api_key
+        )
         
         # Check if OCR should be enabled
         rag_settings = user_settings.get("rag", {})
         ocr_enabled = rag_settings.get("enable_ocr", True)
         
-        if api_key and ocr_enabled:
+        if resolved_google_key and ocr_enabled:
             # Create or update OCR service
             _ocr_service = OCRService(
-                api_key=api_key,
+                api_key=resolved_google_key,
                 user_settings=user_settings
             )
-            logger.info("OCR service updated with user settings")
+            key_source = api_key_resolver.get_key_source(user_settings)
+            logger.info(f"OCR service updated with key from: {key_source} (strict mode)")
         else:
             # Disable OCR service
             _ocr_service = None
-            logger.info("OCR service disabled based on user settings")
+            if not resolved_google_key:
+                logger.info("OCR service disabled - no Google API key available")
+            else:
+                logger.info("OCR service disabled - OCR setting disabled in user settings")
             
     except Exception as e:
         logger.error(f"Failed to update OCR service with user settings: {e}")

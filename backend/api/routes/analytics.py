@@ -9,8 +9,10 @@ import logging
 from domain.analytics.service import AnalyticsService
 from infrastructure.ai.openai_client import OpenAIClient
 from infrastructure.storage.analytics_storage import AnalyticsStorage
+from infrastructure.storage.user_settings_storage import UserSettingsStorage
 from core.dependencies import get_analytics_storage
 from core.config import get_settings, Settings
+from core.api_key_resolver import get_api_key_resolver
 from api.schemas.analytics import (
     ClassificationRequest, ClassificationResponse,
     ExtractionRequest, ExtractionResponse,
@@ -22,26 +24,55 @@ router = APIRouter(prefix="/analytics", tags=["analytics"])
 logger = logging.getLogger(__name__)
 
 
-def get_analytics_service(
+async def get_analytics_service(
     settings: Settings = Depends(get_settings)
 ) -> AnalyticsService:
-    """Get analytics service with LLM"""
-    if not settings.openai.api_key:
-        raise HTTPException(
-            status_code=503,
-            detail="OpenAI API key not configured"
+    """
+    Get analytics service with LLM and resolved API key
+    Uses key resolution to support both system and user-provided keys
+    """
+    try:
+        # Load user settings
+        user_settings_storage = UserSettingsStorage()
+        user_settings = await user_settings_storage.load_settings()
+        user_settings_dict = user_settings.model_dump()
+        
+        # Resolve OpenAI API key
+        api_key_resolver = get_api_key_resolver()
+        resolved_key = api_key_resolver.resolve_openai_key(
+            user_settings=user_settings_dict,
+            fallback_key=settings.openai.api_key
         )
-    
-    client = OpenAIClient(settings.openai.api_key)
-    
-    async def llm_func(prompt: str, system_prompt: str) -> str:
-        messages = [
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": prompt}
-        ]
-        return await client.create_completion(messages, temperature=0.3)
-    
-    return AnalyticsService(llm_func)
+        
+        if not resolved_key:
+            raise HTTPException(
+                status_code=503,
+                detail="OpenAI API key not configured"
+            )
+        
+        key_source = api_key_resolver.get_key_source(user_settings_dict)
+        logger.debug(f"Analytics service using OpenAI key from: {key_source}")
+        
+        # Create OpenAI client with resolved key
+        client = OpenAIClient(resolved_key)
+        
+        async def llm_func(prompt: str, system_prompt: str) -> str:
+            messages = [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": prompt}
+            ]
+            return await client.create_completion(messages, temperature=0.3)
+        
+        return AnalyticsService(llm_func)
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to create analytics service: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to initialize analytics service: {str(e)}"
+        )
 
 
 @router.post("/classify", response_model=ClassificationResponse)

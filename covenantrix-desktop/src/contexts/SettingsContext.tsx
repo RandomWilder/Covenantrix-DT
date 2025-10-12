@@ -4,7 +4,8 @@
  */
 
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import { UserSettings, SettingsContextValue } from '../types/settings';
+import { UserSettings, SettingsContextValue, SettingsError } from '../types/settings';
+import type { ServiceStatus } from '../types/services';
 
 const SettingsContext = createContext<SettingsContextValue | undefined>(undefined);
 
@@ -15,6 +16,8 @@ interface SettingsProviderProps {
 export const SettingsProvider: React.FC<SettingsProviderProps> = ({ children }) => {
   const [settings, setSettings] = useState<UserSettings | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<SettingsError | null>(null);
+  const [serviceStatus, setServiceStatus] = useState<ServiceStatus | null>(null);
 
   // Load settings on mount
   useEffect(() => {
@@ -53,6 +56,7 @@ export const SettingsProvider: React.FC<SettingsProviderProps> = ({ children }) 
   const updateSettings = useCallback(async (updates: Partial<UserSettings>) => {
     try {
       setIsLoading(true);
+      setError(null); // Clear previous errors
       
       const updatedSettings = {
         ...settings,
@@ -65,11 +69,18 @@ export const SettingsProvider: React.FC<SettingsProviderProps> = ({ children }) 
       
       if (response.success) {
         setSettings(updatedSettings);
+        setError(null);
       } else {
-        throw new Error(response.error || 'Failed to update settings');
+        const settingsError: SettingsError = {
+          message: response.error || 'Failed to update settings',
+          validationErrors: response.validationErrors
+        };
+        setError(settingsError);
+        throw new Error(settingsError.message);
       }
     } catch (error) {
       console.error('Error updating settings:', error);
+      // Error state is already set above
       throw error;
     } finally {
       setIsLoading(false);
@@ -108,6 +119,43 @@ export const SettingsProvider: React.FC<SettingsProviderProps> = ({ children }) 
     }
   }, [settings?.api_keys]);
 
+  const fetchServiceStatus = useCallback(async () => {
+    try {
+      const response = await window.electronAPI.getServicesStatus();
+      if (response.success && response.data) {
+        setServiceStatus(response.data);
+      } else {
+        console.error('Failed to fetch service status:', response.error);
+        // Set default unavailable status
+        setServiceStatus({
+          openai_available: false,
+          cohere_available: false,
+          google_available: false,
+          features: {
+            chat: false,
+            upload: false,
+            reranking: false,
+            ocr: false
+          }
+        });
+      }
+    } catch (error) {
+      console.error('Error fetching service status:', error);
+      // Set default unavailable status on error
+      setServiceStatus({
+        openai_available: false,
+        cohere_available: false,
+        google_available: false,
+        features: {
+          chat: false,
+          upload: false,
+          reranking: false,
+          ocr: false
+        }
+      });
+    }
+  }, []);
+
   const applySettings = useCallback(async () => {
     if (!settings) return;
     
@@ -116,19 +164,44 @@ export const SettingsProvider: React.FC<SettingsProviderProps> = ({ children }) 
       if (!response.success) {
         throw new Error(response.error || 'Failed to apply settings');
       }
+      
+      // Check if services were reloaded
+      if (response.restart_required) {
+        console.log('Services reload required, notifying user...');
+        // Note: Services will reload automatically, no action needed
+        // The backend handles RAG engine reinitialization
+      } else if (response.applied_services?.includes('rag_engine_reloaded')) {
+        console.log('Services successfully reloaded with new configuration');
+      }
+      
+      // Fetch updated service status after applying settings
+      await fetchServiceStatus();
     } catch (error) {
       console.error('Error applying settings:', error);
       throw error;
     }
-  }, [settings]);
+  }, [settings, fetchServiceStatus]);
+
+  const clearError = useCallback(() => {
+    setError(null);
+  }, []);
+
+  // Fetch service status on mount
+  useEffect(() => {
+    fetchServiceStatus();
+  }, [fetchServiceStatus]);
 
   const value: SettingsContextValue = {
     settings,
     isLoading,
+    error,
+    serviceStatus,
     updateSettings,
     resetSettings,
     validateApiKeys,
-    applySettings
+    applySettings,
+    fetchServiceStatus,
+    clearError
   };
 
   return (

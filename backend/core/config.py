@@ -2,6 +2,23 @@
 Application Configuration
 Centralized configuration management using pydantic-settings
 All config loaded from environment variables with validation
+
+API Key Resolution (Strict Mode):
+  This file provides system fallback keys ONLY from .env file.
+  These are used when api_keys.mode = "default" in user settings.
+  
+  Actual key resolution happens in api_key_resolver.py with strict mode:
+  - mode = "custom" → Use ONLY user keys from user_settings.json (encrypted)
+  - mode = "default" → Use ONLY system keys from .env (this file)
+  - NO FALLBACK between modes (strict mode enforcement)
+  
+  Resolution order:
+  1. Load .env keys (this file) as system fallback
+  2. Load user_settings.json (user keys + mode preference)
+  3. Resolve via api_key_resolver based on mode (no cross-mode fallback)
+  4. Initialize services with resolved key or None
+  
+  Missing keys result in service = None (graceful degradation).
 """
 from pydantic_settings import BaseSettings
 from pydantic import Field, field_validator
@@ -46,6 +63,8 @@ class Settings(BaseSettings):
     postgres_password: Optional[str] = Field(None, env="POSTGRES_PASSWORD")
     
     # OpenAI configuration
+    # Note: API key resolution happens via api_key_resolver.py
+    # This is the system fallback key from .env
     openai_api_key: Optional[str] = Field(None, env="OPENAI_API_KEY")
     openai_model: str = Field("gpt-4o-mini", env="OPENAI_MODEL")
     openai_embedding_model: str = Field("text-embedding-3-small", env="OPENAI_EMBEDDING_MODEL")
@@ -53,6 +72,8 @@ class Settings(BaseSettings):
     openai_temperature: float = Field(0.7, env="OPENAI_TEMPERATURE")
     
     # Cohere configuration (for reranking)
+    # Note: API key resolution happens via api_key_resolver.py
+    # This is the system fallback key from .env
     cohere_api_key: Optional[str] = Field(None, env="COHERE_API_KEY")
     
     # Storage configuration
@@ -68,6 +89,8 @@ class Settings(BaseSettings):
     server_workers: int = Field(1, env="WORKERS")
     
     # Google Vision configuration
+    # Note: API key resolution happens via api_key_resolver.py
+    # This is the system fallback key from .env
     google_api_key: Optional[str] = Field(None, env="GOOGLE_API_KEY")
     google_vision_enabled: bool = Field(False, env="GOOGLE_VISION_ENABLED")
     google_vision_project_id: Optional[str] = Field(None, env="GOOGLE_VISION_PROJECT_ID")

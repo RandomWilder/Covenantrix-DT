@@ -6,9 +6,10 @@ import { Message } from './Message'
 
 interface ChatPanelProps {
   width: number
+  disabled?: boolean
 }
 
-export const ChatPanel: React.FC<ChatPanelProps> = ({ width }) => {
+export const ChatPanel: React.FC<ChatPanelProps> = ({ width, disabled = false }) => {
   const { 
     activeConversation, 
     sendMessage, 
@@ -95,7 +96,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ width }) => {
       <div className="border-t border-gray-200 dark:border-gray-700 p-4">
         <ChatInput 
           onSubmit={handleSubmit} 
-          disabled={isSubmitting} 
+          disabled={isSubmitting || disabled} 
         />
       </div>
     </div>

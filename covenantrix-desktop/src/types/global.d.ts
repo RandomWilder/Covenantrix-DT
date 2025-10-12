@@ -22,13 +22,47 @@ declare global {
       updateSettings: (settings: any) => Promise<{
         success: boolean;
         error?: string;
+        validationErrors?: Array<{
+          field: string;
+          message: string;
+          type: string;
+        }>;
+        settings?: any;
       }>;
       validateApiKeys: (apiKeys: any) => Promise<{
         success: boolean;
-        error?: string;
+        openai_valid?: boolean | null;
+        cohere_valid?: boolean | null;
+        google_valid?: boolean | null;
+        message?: string;
+        errors?: Record<string, string>;
       }>;
       applySettings: (settings: any) => Promise<{
         success: boolean;
+        error?: string;
+        restart_required?: boolean;
+        applied_services?: string[];
+      }>;
+      getKeyStatus: () => Promise<{
+        success: boolean;
+        has_valid_key: boolean;
+        mode: string | null;
+        message: string;
+        error?: string;
+      }>;
+      getServicesStatus: () => Promise<{
+        success: boolean;
+        data?: {
+          openai_available: boolean;
+          cohere_available: boolean;
+          google_available: boolean;
+          features: {
+            chat: boolean;
+            upload: boolean;
+            reranking: boolean;
+            ocr: boolean;
+          };
+        };
         error?: string;
       }>;
       

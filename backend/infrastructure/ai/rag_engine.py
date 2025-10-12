@@ -58,8 +58,12 @@ class RAGEngine:
             logger.error("[ERROR] OpenAI API key not found in configuration")
             raise ValueError("OpenAI API key required for RAG engine")
         
+        # Debug logging
+        logger.info(f"[DEBUG] RAG Engine received key - length: {len(self.api_key)}, starts with: {self.api_key[:15] if len(self.api_key) >= 15 else self.api_key}")
+        
         # Set API key in environment for LightRAG
         os.environ["OPENAI_API_KEY"] = self.api_key
+        logger.info(f"[DEBUG] Set OPENAI_API_KEY env var - length: {len(os.environ['OPENAI_API_KEY'])}, starts with: {os.environ['OPENAI_API_KEY'][:15]}")
         
         self.working_dir = settings.storage.working_dir
         self.is_initialized = False

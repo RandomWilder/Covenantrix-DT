@@ -4,15 +4,17 @@
  */
 
 import React, { useState } from 'react';
-import { Eye, EyeOff, CheckCircle, XCircle, AlertCircle } from 'lucide-react';
-import { ApiKeySettings, ApiKeyMode } from '../../types/settings';
+import { Eye, EyeOff, CheckCircle, XCircle, AlertCircle, X } from 'lucide-react';
+import { ApiKeySettings, ApiKeyMode, SettingsError } from '../../types/settings';
 
 interface ApiKeysTabProps {
   settings: ApiKeySettings;
   onChange: (settings: ApiKeySettings) => void;
+  error?: SettingsError | null;
+  onClearError?: () => void;
 }
 
-const ApiKeysTab: React.FC<ApiKeysTabProps> = ({ settings, onChange }) => {
+const ApiKeysTab: React.FC<ApiKeysTabProps> = ({ settings, onChange, error, onClearError }) => {
   const [showKeys, setShowKeys] = useState<Record<string, boolean>>({});
   const [validationStatus, setValidationStatus] = useState<Record<string, 'idle' | 'validating' | 'valid' | 'invalid'>>({});
 
@@ -45,17 +47,32 @@ const ApiKeysTab: React.FC<ApiKeysTabProps> = ({ settings, onChange }) => {
     setValidationStatus(prev => ({ ...prev, [keyName]: 'validating' }));
 
     try {
-      // This would call the backend validation endpoint
-      // For now, we'll simulate validation
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      // Call the backend validation endpoint
+      const validationRequest: any = {};
+      validationRequest[keyName] = keyValue;
       
-      // Simulate validation result (in real implementation, this would be actual API validation)
-      const isValid = keyValue.length > 10; // Simple validation for demo
+      const response = await window.electronAPI.validateApiKeys(validationRequest);
+      
+      // Check the specific key validation result
+      let isValid = false;
+      if (keyName === 'openai') {
+        isValid = response.openai_valid === true;
+      } else if (keyName === 'cohere') {
+        isValid = response.cohere_valid === true;
+      } else if (keyName === 'google') {
+        isValid = response.google_valid === true;
+      }
+      
       setValidationStatus(prev => ({ 
         ...prev, 
         [keyName]: isValid ? 'valid' : 'invalid' 
       }));
+      
+      if (!isValid && response.errors && response.errors[keyName]) {
+        console.error(`${keyName} validation error:`, response.errors[keyName]);
+      }
     } catch (error) {
+      console.error(`Error validating ${keyName} key:`, error);
       setValidationStatus(prev => ({ ...prev, [keyName]: 'invalid' }));
     }
   };
@@ -84,6 +101,41 @@ const ApiKeysTab: React.FC<ApiKeysTabProps> = ({ settings, onChange }) => {
         </p>
       </div>
 
+      {/* Error Display */}
+      {error && (
+        <div className="p-4 bg-red-50 dark:bg-red-900/20 rounded-lg border border-red-200 dark:border-red-800">
+          <div className="flex items-start space-x-3">
+            <XCircle className="w-5 h-5 text-red-500 mt-0.5 flex-shrink-0" />
+            <div className="flex-1">
+              <h4 className="text-sm font-medium text-red-800 dark:text-red-200 mb-1">
+                Validation Error
+              </h4>
+              <p className="text-sm text-red-700 dark:text-red-300">
+                {error.message}
+              </p>
+              {error.validationErrors && error.validationErrors.length > 0 && (
+                <ul className="mt-2 space-y-1">
+                  {error.validationErrors.map((err, idx) => (
+                    <li key={idx} className="text-xs text-red-600 dark:text-red-400">
+                      <strong>{err.field}:</strong> {err.message}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+            {onClearError && (
+              <button
+                onClick={onClearError}
+                className="text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-200"
+                aria-label="Dismiss error"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Mode Selection */}
       <div className="space-y-4">
         <div>
@@ -105,7 +157,7 @@ const ApiKeysTab: React.FC<ApiKeysTabProps> = ({ settings, onChange }) => {
                   Use Default Keys
                 </div>
                 <div className="text-xs text-gray-500 dark:text-gray-400">
-                  Use pre-configured API keys (recommended for most users)
+                  Use system keys provided by administrators. Recommended for most users.
                 </div>
               </div>
             </label>
@@ -124,7 +176,7 @@ const ApiKeysTab: React.FC<ApiKeysTabProps> = ({ settings, onChange }) => {
                   Use Custom Keys
                 </div>
                 <div className="text-xs text-gray-500 dark:text-gray-400">
-                  Provide your own API keys for full control
+                  Provide your own API keys. Only your custom keys will be used (no automatic fallback).
                 </div>
               </div>
             </label>
@@ -134,17 +186,22 @@ const ApiKeysTab: React.FC<ApiKeysTabProps> = ({ settings, onChange }) => {
         {/* Custom Keys Section */}
         {settings.mode === 'custom' && (
           <div className="space-y-4 p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
-            <div className="flex items-center space-x-2 mb-4">
-              <AlertCircle className="w-5 h-5 text-amber-500" />
-              <span className="text-sm font-medium text-amber-700 dark:text-amber-400">
-                Custom API Keys
-              </span>
+            <div className="space-y-2 mb-4">
+              <div className="flex items-center space-x-2">
+                <AlertCircle className="w-5 h-5 text-amber-500" />
+                <span className="text-sm font-medium text-amber-700 dark:text-amber-400">
+                  Custom API Keys - Strict Mode
+                </span>
+              </div>
+              <p className="text-xs text-gray-600 dark:text-gray-300 pl-7">
+                This key will be used exclusively. No automatic fallback will occur. If the key is invalid, services will be disabled until corrected.
+              </p>
             </div>
 
             {/* OpenAI Key */}
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                OpenAI API Key
+                OpenAI API Key <span className="text-red-500">*</span>
               </label>
               <div className="relative">
                 <input
@@ -166,15 +223,22 @@ const ApiKeysTab: React.FC<ApiKeysTabProps> = ({ settings, onChange }) => {
                   </button>
                 </div>
               </div>
-              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                Required for AI chat and document processing
-              </p>
+              <div className="mt-1 space-y-1">
+                <p className="text-xs text-gray-600 dark:text-gray-300">
+                  Required for AI chat and document processing
+                </p>
+                {validationStatus.openai === 'invalid' && (
+                  <p className="text-xs text-red-600 dark:text-red-400 font-medium">
+                    The OpenAI API key you entered is invalid. Please verify your key and try again. No automatic fallback will occur.
+                  </p>
+                )}
+              </div>
             </div>
 
             {/* Cohere Key */}
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                Cohere API Key
+                Cohere API Key <span className="text-gray-400">(optional)</span>
               </label>
               <div className="relative">
                 <input
@@ -196,15 +260,27 @@ const ApiKeysTab: React.FC<ApiKeysTabProps> = ({ settings, onChange }) => {
                   </button>
                 </div>
               </div>
-              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                Optional: Improves search result ranking
-              </p>
+              <div className="mt-1 space-y-1">
+                <p className="text-xs text-gray-600 dark:text-gray-300">
+                  Optional: Enables reranking features for improved search results
+                </p>
+                {!settings.cohere && (
+                  <p className="text-xs text-amber-600 dark:text-amber-400">
+                    ⚠️ Cohere API key not provided. Reranking features will not be available.
+                  </p>
+                )}
+                {validationStatus.cohere === 'invalid' && (
+                  <p className="text-xs text-red-600 dark:text-red-400 font-medium">
+                    The Cohere API key you entered is invalid. Please verify your key and try again.
+                  </p>
+                )}
+              </div>
             </div>
 
             {/* Google Cloud Key */}
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                Google Cloud API Key
+                Google Cloud API Key <span className="text-gray-400">(optional)</span>
               </label>
               <div className="relative">
                 <input
@@ -226,9 +302,21 @@ const ApiKeysTab: React.FC<ApiKeysTabProps> = ({ settings, onChange }) => {
                   </button>
                 </div>
               </div>
-              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                Used for Vision API (OCR), Drive integration, and other Google Cloud services
-              </p>
+              <div className="mt-1 space-y-1">
+                <p className="text-xs text-gray-600 dark:text-gray-300">
+                  Optional: Enables OCR features for scanned documents and image processing
+                </p>
+                {!settings.google && (
+                  <p className="text-xs text-amber-600 dark:text-amber-400">
+                    ⚠️ Google API key not provided. OCR features will not be available.
+                  </p>
+                )}
+                {validationStatus.google === 'invalid' && (
+                  <p className="text-xs text-red-600 dark:text-red-400 font-medium">
+                    The Google API key you entered is invalid. Please verify your key and try again.
+                  </p>
+                )}
+              </div>
             </div>
           </div>
         )}

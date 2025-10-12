@@ -30,9 +30,10 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
     isLoading, 
     validation,
     apiKeyValidation,
-    validateAllApiKeys
+    validateAllApiKeys,
+    error: settingsError,
+    clearError
   } = useSettings();
-  
   const { showToast } = useToast();
   const [activeTab, setActiveTab] = useState<TabType>('api-keys');
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
@@ -47,24 +48,62 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
       setError(null);
       setIsValidating(true);
       
-      // Validate API keys if in custom mode
+      // Validate ALL provided custom keys if in custom mode
       if (localSettings.api_keys?.mode === 'custom') {
         const validationResults = await validateAllApiKeys();
         const hasInvalidKeys = Object.values(validationResults).some(result => result === false);
         
         if (hasInvalidKeys) {
-          showToast('Please fix invalid API keys before saving', 'error');
+          // Show specific error messages per key type
+          const keyErrors: string[] = [];
+          if (validationResults.openai === false) keyErrors.push('OpenAI');
+          if (validationResults.cohere === false) keyErrors.push('Cohere');
+          if (validationResults.google === false) keyErrors.push('Google');
+          
+          showToast(`Invalid API keys: ${keyErrors.join(', ')}. Please check and try again.`, 'error');
           return;
+        }
+        
+        // Show warnings for missing optional keys
+        if (!localSettings.api_keys.google) {
+          showToast('Note: Google API key not provided. OCR features will not be available.', 'warning');
+        }
+        if (!localSettings.api_keys.cohere) {
+          showToast('Note: Cohere API key not provided. Reranking features will not be available.', 'warning');
         }
       }
       
+      // Default mode: NEVER block saves (system keys managed externally)
       // Save the local settings
       await updateSettingsWithValidation(localSettings);
+      
+      // Apply settings and refresh service status (handled by SettingsContext)
       await applySettings();
+      
       showToast('Settings saved and applied successfully', 'success');
       setHasUnsavedChanges(false);
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Failed to save settings';
+    } catch (error: any) {
+      // Handle backend validation errors (HTTP 400)
+      let errorMessage = 'Failed to save settings';
+      
+      if (error.response?.status === 400 && error.response?.data?.detail) {
+        const detail = error.response.data.detail;
+        
+        // Check if detail contains validation errors object
+        if (typeof detail === 'object' && detail.errors) {
+          const keyErrors = Object.entries(detail.errors)
+            .map(([key, msg]) => `${key}: ${msg}`)
+            .join('; ');
+          errorMessage = `Validation failed: ${keyErrors}`;
+        } else if (typeof detail === 'string') {
+          errorMessage = detail;
+        } else if (detail.message) {
+          errorMessage = detail.message;
+        }
+      } else if (error instanceof Error) {
+        errorMessage = error.message;
+      }
+      
       setError(errorMessage);
       showToast(errorMessage, 'error');
     } finally {
@@ -274,6 +313,8 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
                     <ApiKeysTab
                       settings={localSettings.api_keys || { mode: 'default' }}
                       onChange={(updates: any) => handleSettingsChange({ api_keys: updates })}
+                      error={settingsError}
+                      onClearError={clearError}
                     />
                   )}
                   {activeTab === 'language' && (
