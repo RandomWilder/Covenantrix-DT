@@ -27,7 +27,7 @@ const ApiKeysTab: React.FC<ApiKeysTabProps> = ({ settings, onChange, error, onCl
       ...settings,
       mode,
       // Clear custom keys when switching to default
-      ...(mode === 'default' ? {} : {})
+      ...(mode === 'default' ? { openai: undefined, cohere: undefined, google: undefined } : {})
     });
   };
 

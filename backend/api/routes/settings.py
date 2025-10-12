@@ -397,34 +397,18 @@ async def apply_settings(request: SettingsApplyRequest):
         api_keys = settings_dict.get("api_keys", {})
         mode = api_keys.get("mode", "default")
         
-        # If in custom mode, reload RAG engine with fresh settings from storage
-        if mode == "custom":
-            logger.info("Custom mode detected, attempting to reload RAG engine")
-            reload_success = await reload_rag_with_settings()
-            
-            if reload_success:
-                applied_services.append("rag_engine_reloaded")
-                logger.info("RAG engine successfully reloaded with new keys")
-                restart_required = False  # Successfully reloaded, no restart needed
-            else:
-                logger.warning("RAG engine reload failed, restart may be required")
-                restart_required = True
+        # Always reload RAG engine when applying settings
+        # This ensures strict mode is respected - custom mode uses user keys, default mode uses system keys
+        logger.info(f"Applying settings in {mode} mode, reloading RAG engine with strict key resolution")
+        reload_success = await reload_rag_with_settings()
+        
+        if reload_success:
+            applied_services.append("rag_engine_reloaded")
+            logger.info(f"RAG engine successfully reloaded with {mode} mode key")
+            restart_required = False  # Successfully reloaded, no restart needed
         else:
-            # Apply settings to existing RAG engine
-            try:
-                from core.dependencies import get_rag_engine
-                from infrastructure.ai.rag_engine import RAGEngine
-                
-                # Get current RAG engine instance
-                rag_engine = get_rag_engine()
-                if isinstance(rag_engine, RAGEngine):
-                    rag_engine.apply_settings(settings_dict)
-                    applied_services.append("rag_engine")
-                    logger.info("RAG engine settings applied")
-                else:
-                    logger.warning("RAG engine not available for settings application")
-            except Exception as e:
-                logger.error(f"Failed to apply RAG settings: {e}")
+            logger.warning("RAG engine reload failed, restart may be required")
+            restart_required = True
         
         # Apply OCR settings
         try:
