@@ -37,6 +37,11 @@ jobs:
           node-version: '20'
           cache: 'npm'
           cache-dependency-path: covenantrix-desktop/package-lock.json
+      
+      - name: Setup Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
           
       - name: Install frontend dependencies
         working-directory: covenantrix-desktop
@@ -52,45 +57,62 @@ jobs:
           echo "Creating Windows Python distribution..."
           mkdir -p dist/python-dist
           
-          # Download embedded Python
+          echo "Downloading embedded Python..."
           curl -L -o python-embed.zip ${{ matrix.python_url }} || exit 1
+          
+          echo "Extracting Python..."
           unzip -q python-embed.zip -d dist/python-dist/ || exit 1
           
-          # Verify
-          test -f dist/python-dist/python.exe || exit 1
+          if [ ! -f "dist/python-dist/python.exe" ]; then
+            echo "ERROR: Python executable not found after extraction"
+            exit 1
+          fi
           
-          # Enable site-packages
-          echo "import sys; import os; sys.path.append(os.path.join(os.path.dirname(__file__), 'Lib', 'site-packages'))" > dist/python-dist/sitecustomize.py
-          sed -i 's/#import site/import site/' dist/python-dist/python311._pth
+          echo "Configuring Python paths..."
+          cat > dist/python-dist/python311._pth << 'EOF'
+          python311.zip
+          .
+          ./Lib
+          ./Lib/site-packages
+          import site
+          EOF
           
-          # Setup directories
           mkdir -p dist/python-dist/Lib/site-packages
           
-          # Install pip
+          echo "Installing pip..."
           curl -L https://bootstrap.pypa.io/get-pip.py -o get-pip.py || exit 1
-          dist/python-dist/python.exe get-pip.py --target dist/python-dist/Lib/site-packages --no-warn-script-location || exit 1
+          dist/python-dist/python.exe get-pip.py --no-warn-script-location || exit 1
           
-          # Install packages
-          dist/python-dist/python.exe -m pip install --target dist/python-dist/Lib/site-packages --no-warn-script-location -r backend/requirements.txt || exit 1
+          echo "Installing packages..."
+          dist/python-dist/python.exe -m pip install --upgrade pip setuptools wheel || exit 1
+          dist/python-dist/python.exe -m pip install -r backend/requirements.txt || exit 1
           
-          echo "✅ Windows Python distribution created"
+          echo "Windows Python distribution created successfully"
           
       # === PYTHON DISTRIBUTION (MACOS) ===
       
       - name: Create Python Distribution (macOS)
         if: matrix.os == 'macos-latest'
+        shell: bash
         run: |
           echo "Creating macOS Python distribution..."
-          python3 -m venv dist/python-dist
+          
+          # Use Python 3.11 specifically (installed by setup-python action)
+          python3.11 -m venv dist/python-dist || exit 1
           source dist/python-dist/bin/activate
           
-          pip install --upgrade pip || exit 1
-          pip install -r backend/requirements.txt || exit 1
+          echo "Upgrading pip..."
+          pip install --upgrade pip setuptools wheel || exit 1
           
-          # Create python symlink
+          echo "Installing packages (preferring binary wheels)..."
+          pip install -r backend/requirements.txt --prefer-binary || exit 1
+          
+          # Verify PyMuPDF installed correctly
+          python -c "import fitz; print(f'PyMuPDF version: {fitz.__version__}')" || exit 1
+          
           ln -sf python3 dist/python-dist/bin/python
           
-          echo "✅ macOS Python distribution created"
+          echo "macOS Python distribution created successfully"
       
       # === VERIFICATION ===
       
@@ -105,16 +127,20 @@ jobs:
             PYTHON_CMD="dist/python-dist/bin/python"
           fi
           
-          # Test Python
+          echo "Python version:"
           $PYTHON_CMD --version || exit 1
           
-          # Test critical imports
-          $PYTHON_CMD -c "import fastapi; print('✓ FastAPI')" || exit 1
-          $PYTHON_CMD -c "import uvicorn; print('✓ Uvicorn')" || exit 1
-          $PYTHON_CMD -c "import pydantic; print('✓ Pydantic')" || exit 1
-          $PYTHON_CMD -c "import openai; print('✓ OpenAI')" || exit 1
+          echo "Testing package imports..."
+          $PYTHON_CMD -c "import fastapi; print('FastAPI OK')" || exit 1
+          $PYTHON_CMD -c "import uvicorn; print('Uvicorn OK')" || exit 1
+          $PYTHON_CMD -c "import pydantic; print('Pydantic OK')" || exit 1
+          $PYTHON_CMD -c "import openai; print('OpenAI OK')" || exit 1
           
-          echo "✅ All imports successful"
+          echo "Testing PyMuPDF (critical for OCR)..."
+          $PYTHON_CMD -c "import fitz; print('PyMuPDF OK')" || exit 1
+          $PYTHON_CMD -c "from google.cloud import vision; print('Google Vision OK')" || exit 1
+          
+          echo "All imports successful"
       
       - name: Test Backend
         shell: bash
@@ -127,32 +153,28 @@ jobs:
             PYTHON_CMD="dist/python-dist/bin/python"
           fi
           
-          # Start backend in background
           cd backend
           ../$PYTHON_CMD main.py &
           BACKEND_PID=$!
           cd ..
           
-          echo "Backend PID: $BACKEND_PID"
+          echo "Backend started with PID: $BACKEND_PID"
           
-          # Wait for startup
           for i in {1..30}; do
             if curl -s http://127.0.0.1:8000/health > /dev/null 2>&1; then
-              echo "✅ Backend responding"
+              echo "Backend is responding"
               break
             fi
-            echo "Waiting... ($i/30)"
+            echo "Waiting for backend... ($i/30)"
             sleep 2
           done
           
-          # Test health endpoint
           curl -f http://127.0.0.1:8000/health || exit 1
           
-          # Cleanup
           kill $BACKEND_PID || true
           sleep 2
           
-          echo "✅ Backend test passed"
+          echo "Backend test passed"
       
       # === BUILD ELECTRON ===
       
