@@ -154,30 +154,11 @@ jobs:
           
           echo "✅ Backend test passed"
       
-      # === PREPARE RESOURCES ===
-      
-      - name: Prepare Backend Resources
-        shell: bash
-        run: |
-          echo "=== Preparing Backend Resources ==="
-          mkdir -p covenantrix-desktop/resources/backend
-          mkdir -p covenantrix-desktop/resources/python-dist
-          
-          # Copy backend source
-          cp -r backend/* covenantrix-desktop/resources/backend/
-          
-          # Copy Python distribution
-          cp -r dist/python-dist/* covenantrix-desktop/resources/python-dist/
-          
-          # Verify
-          ls -la covenantrix-desktop/resources/
-          echo "✅ Resources prepared"
-      
       # === BUILD ELECTRON ===
       
       - name: Build Electron App
         working-directory: covenantrix-desktop
-        run: npm run build
+        run: npm run package:${{ matrix.platform }}
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           

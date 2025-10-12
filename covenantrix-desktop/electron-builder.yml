@@ -21,8 +21,7 @@ files:
 
 # Use asar for better compression
 asar: true
-asarUnpack:
-  - resources/**/*
+# extraResources are automatically unpacked, no need for asarUnpack
 
 directories:
   buildResources: build
@@ -121,7 +120,14 @@ protocols:
 # BACKEND RESOURCES
 # ============================================
 extraResources:
-  - from: resources
-    to: resources
+  - from: ../backend
+    to: backend
+    filter:
+      - "**/*"
+      - "!**/__pycache__"
+      - "!**/*.pyc"
+      - "!**/tests/**"
+  - from: ../dist/python-dist
+    to: python-dist
     filter:
       - "**/*"
