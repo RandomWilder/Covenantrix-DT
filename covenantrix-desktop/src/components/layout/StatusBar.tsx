@@ -26,7 +26,7 @@ const StatusBar: React.FC = () => {
           <span>{currentTime}</span>
         </div>
         <div className="text-xs">
-          Covenantrix v1.0.17
+          Covenantrix v1.0.18
         </div>
       </div>
     </div>

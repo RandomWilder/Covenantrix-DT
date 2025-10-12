@@ -47,8 +47,8 @@ nsis:
   createDesktopShortcut: true
   createStartMenuShortcut: true
   shortcutName: ${productName}
-  installerIcon: build/icon.ico
-  uninstallerIcon: build/icon.ico
+  installerIcon: public/icons/icon.ico
+  uninstallerIcon: public/icons/icon.ico
   license: LICENSE
   deleteAppDataOnUninstall: true
   packElevateHelper: false
@@ -62,12 +62,13 @@ mac:
   target:
     - target: dmg
       arch:
-        - universal
-  icon: build/icon.icns
+        - x64
+        - arm64
+  icon: public/icons/icon.icns
   category: public.app-category.productivity
   hardenedRuntime: false
   gatekeeperAssess: false
-  artifactName: ${productName}-${version}.${ext}
+  artifactName: ${productName}-${version}-${arch}.${ext}
   
 dmg:
   contents:
@@ -90,7 +91,7 @@ linux:
     - target: AppImage
       arch:
         - x64
-  icon: build/icon.png
+  icon: public/icons/icon.png
   category: Office
   artifactName: ${productName}-${version}.${ext}
   
