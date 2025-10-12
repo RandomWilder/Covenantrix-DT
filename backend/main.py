@@ -38,7 +38,7 @@ logger = logging.getLogger(__name__)
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Application lifespan manager"""
-    logger.info("🚀 Starting Covenantrix Backend...")
+    logger.info("Starting Covenantrix Backend...")
     
     # Initialize RAG engine
     settings = get_settings()
@@ -63,23 +63,23 @@ async def lifespan(app: FastAPI):
                 # Store globally for dependency injection
                 set_rag_engine(rag_engine)
                 
-                logger.info("✓ RAG engine initialized and registered with user settings")
+                logger.info("[OK] RAG engine initialized and registered with user settings")
             else:
-                logger.warning("⚠ LightRAG not available - install with: pip install lightrag-hku")
+                logger.warning("[WARNING] LightRAG not available - install with: pip install lightrag-hku")
         except Exception as e:
-            logger.error(f"✗ RAG engine initialization failed: {e}")
+            logger.error(f"[ERROR] RAG engine initialization failed: {e}")
             import traceback
             logger.error(traceback.format_exc())
             # Don't continue if RAG engine fails - it's critical for chat functionality
             raise
     else:
-        logger.warning("⚠ OpenAI API key not configured - RAG features disabled")
+        logger.warning("[WARNING] OpenAI API key not configured - RAG features disabled")
     
-    logger.info("✓ Covenantrix Backend ready")
+    logger.info("[OK] Covenantrix Backend ready")
     
     yield
     
-    logger.info("🛑 Shutting down Covenantrix Backend...")
+    logger.info("Shutting down Covenantrix Backend...")
 
 
 # Create FastAPI application

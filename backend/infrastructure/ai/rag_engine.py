@@ -18,10 +18,10 @@ try:
     from lightrag.base import EmbeddingFunc
     from lightrag.kg.shared_storage import initialize_pipeline_status
     LIGHTRAG_AVAILABLE = True
-    logger.info("✓ LightRAG imported successfully")
+    logger.info("[OK] LightRAG imported successfully")
 except ImportError as e:
     LIGHTRAG_AVAILABLE = False
-    logger.error(f"✗ LightRAG import failed: {e}")
+    logger.error(f"[ERROR] LightRAG import failed: {e}")
 
 # Try to import Cohere
 try:
@@ -55,7 +55,7 @@ class RAGEngine:
         self.api_key = api_key or settings.openai.api_key
         
         if not self.api_key:
-            logger.error("✗ OpenAI API key not found in configuration")
+            logger.error("[ERROR] OpenAI API key not found in configuration")
             raise ValueError("OpenAI API key required for RAG engine")
         
         # Set API key in environment for LightRAG
@@ -69,7 +69,7 @@ class RAGEngine:
         # Store user settings for configuration
         self.user_settings = user_settings or {}
         
-        logger.info(f"✓ RAG Engine created with API key (length: {len(self.api_key)})")
+        logger.info(f"[OK] RAG Engine created with API key (length: {len(self.api_key)})")
     
     def _create_embedding_func(self):
         """Create embedding function wrapped in LightRAG's EmbeddingFunc"""
@@ -243,7 +243,7 @@ class RAGEngine:
         # Initialize Cohere client (use ClientV2 for latest API)
         try:
             co = cohere.ClientV2(api_key=cohere_api_key)
-            self.logger.info("✓ Cohere client initialized (ClientV2)")
+            self.logger.info("[OK] Cohere client initialized (ClientV2)")
         except Exception as e:
             self.logger.error(f"Failed to initialize Cohere client: {e}")
             return None
@@ -319,9 +319,9 @@ class RAGEngine:
             # Create rerank function (Cohere-based)
             rerank_func = self._create_rerank_func()
             if rerank_func:
-                self.logger.info("✓ Cohere reranking enabled")
+                self.logger.info("[OK] Cohere reranking enabled")
             else:
-                self.logger.info("ℹ Reranking disabled (Cohere API key not configured)")
+                self.logger.info("[INFO] Reranking disabled (Cohere API key not configured)")
             
             # Initialize LightRAG with custom functions and optional reranking
             self._rag = LightRAG(
@@ -340,19 +340,19 @@ class RAGEngine:
             await initialize_pipeline_status()
             
             self.is_initialized = True
-            self.logger.info(f"✓ RAG engine initialized with text-embedding-3-large (3072 dims)")
-            self.logger.info(f"✓ Working directory: {self.working_dir}")
+            self.logger.info(f"[OK] RAG engine initialized with text-embedding-3-large (3072 dims)")
+            self.logger.info(f"[OK] Working directory: {self.working_dir}")
             
             # Log reranking status clearly
             if rerank_func:
-                self.logger.info("✓ Reranking: ENABLED (Cohere rerank-english-v3.0)")
+                self.logger.info("[OK] Reranking: ENABLED (Cohere rerank-english-v3.0)")
             else:
-                self.logger.info("✓ Reranking: DISABLED")
+                self.logger.info("[OK] Reranking: DISABLED")
             
             return True
             
         except Exception as e:
-            self.logger.error(f"✗ RAG engine initialization failed: {str(e)}")
+            self.logger.error(f"[ERROR] RAG engine initialization failed: {str(e)}")
             import traceback
             self.logger.error(traceback.format_exc())
             self.is_initialized = False
