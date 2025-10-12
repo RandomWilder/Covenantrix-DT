@@ -142,6 +142,13 @@ jobs:
           
           echo "All imports successful"
       
+      - name: Install libmagic (macOS)
+        if: matrix.os == 'macos-latest'
+        run: |
+          echo "Installing libmagic for file type detection..."
+          brew install libmagic || exit 1
+          echo "libmagic installed successfully"
+      
       - name: Test Backend
         shell: bash
         run: |
