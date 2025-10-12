@@ -49,7 +49,6 @@ nsis:
   shortcutName: ${productName}
   installerIcon: public/icons/icon.ico
   uninstallerIcon: public/icons/icon.ico
-  license: LICENSE
   deleteAppDataOnUninstall: true
   packElevateHelper: false
   perMachine: false
@@ -96,7 +95,6 @@ linux:
   artifactName: ${productName}-${version}.${ext}
   
 appImage:
-  license: LICENSE
   category: Office
 
 # ============================================
