@@ -44,15 +44,18 @@ win:
 nsis:
   oneClick: false
   allowToChangeInstallationDirectory: true
+  allowElevation: true
   createDesktopShortcut: true
   createStartMenuShortcut: true
   shortcutName: ${productName}
   installerIcon: public/icons/icon.ico
   uninstallerIcon: public/icons/icon.ico
   deleteAppDataOnUninstall: true
-  packElevateHelper: false
+  packElevateHelper: true
   perMachine: false
+  runAfterFinish: true
   unicode: true
+  include: build/installer.nsh
 
 # ============================================
 # MACOS CONFIGURATION
@@ -103,7 +106,7 @@ appImage:
 publish:
   provider: github
   owner: RandomWilder
-  repo: covenantrix-desktop
+  repo: Covenantrix-DT
   releaseType: release
   publishAutoUpdate: true
 
