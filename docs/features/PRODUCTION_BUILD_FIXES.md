@@ -49,16 +49,11 @@ Fixed critical production build issues that prevented the application from launc
   - Added `allowElevation: true`
   - Changed `packElevateHelper` from `false` to `true`
   - Added `runAfterFinish: true`
-  - Added `include: build/installer.nsh`
-
-**Files Created**:
-- `covenantrix-desktop/build/installer.nsh`: Custom NSIS script to handle running processes
 
 **Features**:
-- Automatically detects and closes running Covenantrix instances before installation
-- Graceful shutdown attempt first, force close if needed
-- Prevents "cannot be closed" errors during installation
-- Cleaner uninstallation process
+- Better elevation handling for installation
+- Launch application after installation completes
+- Improved installer reliability
 
 ## Testing Checklist
 

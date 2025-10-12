@@ -55,7 +55,6 @@ nsis:
   perMachine: false
   runAfterFinish: true
   unicode: true
-  include: build/installer.nsh
 
 # ============================================
 # MACOS CONFIGURATION
