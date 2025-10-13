@@ -39,6 +39,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getStoragePath: () => ipcRenderer.invoke('get-storage-path'),
   validateStorageDirectory: () => ipcRenderer.invoke('validate-storage-directory'),
   
+  // Google OAuth
+  startGoogleOAuth: () => ipcRenderer.invoke('google-oauth-start'),
+  onOAuthCallback: (callback) => ipcRenderer.on('oauth-callback', (event, data) => callback(data)),
+  
   // Event listeners
   onDocumentProcessed: (callback) => ipcRenderer.on('document-processed', callback),
   onSettingsChanged: (callback) => ipcRenderer.on('settings-changed', callback),

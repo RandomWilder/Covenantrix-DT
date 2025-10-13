@@ -4,18 +4,19 @@
  */
 
 import React, { useState } from 'react';
-import { CheckCircle, ArrowRight, Settings, Key, Globe, Brain, Palette } from 'lucide-react';
+import { CheckCircle, ArrowRight, Settings, Key, Globe, Brain, Palette, User } from 'lucide-react';
 import { useSettings } from '../../contexts/SettingsContext';
 import { useToast } from '../../hooks/useToast';
 import { UserSettings } from '../../types/settings';
 import { getDefaultSettings } from '../../utils/settings';
+import { ProfileSetupStep } from './ProfileSetupStep';
 
 interface SettingsSetupProps {
   onComplete: () => void;
   onSkip: () => void;
 }
 
-type SetupStep = 'welcome' | 'api-keys' | 'language' | 'rag' | 'appearance' | 'complete';
+type SetupStep = 'welcome' | 'profile' | 'api-keys' | 'language' | 'rag' | 'appearance' | 'complete';
 
 const SettingsSetup: React.FC<SettingsSetupProps> = ({ onComplete, onSkip }) => {
   const { settings, updateSettings, validateApiKeys } = useSettings();
@@ -26,10 +27,11 @@ const SettingsSetup: React.FC<SettingsSetupProps> = ({ onComplete, onSkip }) => 
   const defaults = getDefaultSettings();
 
   const steps = [
-    { id: 'welcome', title: 'Welcome to Covenantrix', icon: Settings },
+    { id: 'welcome', title: 'Welcome', icon: Settings },
+    { id: 'profile', title: 'Profile', icon: User },
     { id: 'api-keys', title: 'API Keys', icon: Key },
     { id: 'language', title: 'Language', icon: Globe },
-    { id: 'rag', title: 'AI Configuration', icon: Brain },
+    { id: 'rag', title: 'AI Config', icon: Brain },
     { id: 'appearance', title: 'Appearance', icon: Palette },
     { id: 'complete', title: 'Complete', icon: CheckCircle }
   ];
@@ -96,6 +98,7 @@ const SettingsSetup: React.FC<SettingsSetupProps> = ({ onComplete, onSkip }) => 
             <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-4 max-w-md mx-auto">
               <h3 className="font-semibold text-blue-900 dark:text-blue-100 mb-2">What we'll configure:</h3>
               <ul className="text-sm text-blue-800 dark:text-blue-200 space-y-1">
+                <li>• Your profile (optional)</li>
                 <li>• API keys for AI services</li>
                 <li>• Language preferences</li>
                 <li>• AI behavior settings</li>
@@ -103,6 +106,14 @@ const SettingsSetup: React.FC<SettingsSetupProps> = ({ onComplete, onSkip }) => 
               </ul>
             </div>
           </div>
+        );
+
+      case 'profile':
+        return (
+          <ProfileSetupStep
+            initialProfile={settings?.profile}
+            onSave={(profile) => handleSettingsChange({ profile })}
+          />
         );
 
       case 'api-keys':

@@ -256,6 +256,10 @@ export enum DocumentType {
     error?: string;
     stage?: DocumentProgressStage;
     stageMessage?: string;
+    source?: 'local' | 'drive';
+    sourceAccount?: string;  // Email for Drive files (display only)
+    driveAccountId?: string; // Google account ID for API calls
+    driveFileId?: string;    // Google Drive file ID
   }
 
   export interface UploadProgress {

@@ -13,6 +13,10 @@ interface FileItem {
   error?: string
   stage?: DocumentProgressStage
   stageMessage?: string
+  source?: 'local' | 'drive'
+  sourceAccount?: string  // Email for Drive files (display only)
+  driveAccountId?: string // Google account ID for API calls
+  driveFileId?: string    // Google Drive file ID
 }
 
 interface UploadProgress {
@@ -33,6 +37,10 @@ interface PersistedUploadState {
     error?: string
     stage?: DocumentProgressStage
     stageMessage?: string
+    source?: 'local' | 'drive'
+    sourceAccount?: string
+    driveAccountId?: string
+    driveFileId?: string
   }>
   isUploading: boolean
   uploadProgress: UploadProgress
@@ -223,7 +231,11 @@ export const useUpload = () => {
             progress: f.progress,
             error: f.error,
             stage: f.stage,
-            stageMessage: f.stageMessage
+            stageMessage: f.stageMessage,
+            source: f.source,
+            sourceAccount: f.sourceAccount,
+            driveAccountId: f.driveAccountId,
+            driveFileId: f.driveFileId
           }))
           
           setFiles(restoredFiles)
@@ -266,7 +278,11 @@ export const useUpload = () => {
         progress: f.progress,
         error: f.error,
         stage: f.stage,
-        stageMessage: f.stageMessage
+        stageMessage: f.stageMessage,
+        source: f.source,
+        sourceAccount: f.sourceAccount,
+        driveAccountId: f.driveAccountId,
+        driveFileId: f.driveFileId
       })),
       isUploading,
       uploadProgress,
@@ -281,11 +297,28 @@ export const useUpload = () => {
       id: Math.random().toString(36).substr(2, 9),
       file,
       filename: file.name,
-      status: 'pending'
+      status: 'pending',
+      source: 'local'
     }))
     
     setFiles(prev => [...prev, ...fileItems])
     showToast(`${newFiles.length} file(s) added`, 'success')
+  }, [showToast])
+
+  const addDriveFiles = useCallback((driveFiles: Array<{id: string; name: string; size?: number}>, accountId: string, accountEmail: string) => {
+    const fileItems: FileItem[] = driveFiles.map(driveFile => ({
+      id: driveFile.id, // Use Drive file ID
+      file: new File([], driveFile.name), // Placeholder File object
+      filename: driveFile.name,
+      status: 'pending' as const,
+      source: 'drive' as const,
+      sourceAccount: accountEmail,  // Email for display
+      driveAccountId: accountId,    // Account ID for API calls
+      driveFileId: driveFile.id
+    }))
+    
+    setFiles(prev => [...prev, ...fileItems])
+    showToast(`Added ${driveFiles.length} Drive file(s) to queue`, 'success')
   }, [showToast])
 
   const removeFile = useCallback((id: string) => {
@@ -318,7 +351,7 @@ export const useUpload = () => {
     ))
   }, [])
 
-  const startUpload = useCallback(async (type: 'local' | 'drive') => {
+  const startUpload = useCallback(async () => {
     if (files.length === 0) {
       showToast('No files selected', 'error')
       return
@@ -336,24 +369,57 @@ export const useUpload = () => {
     setUploadProgress(progress)
 
     try {
-      if (type === 'local') {
-        await uploadLocalFiles(files, progress, updateFileStatus, setUploadProgress)
-      } else {
-        await uploadGoogleDriveFiles(files, progress, updateFileStatus, setUploadProgress)
+      // Group files by source
+      const localFiles = files.filter(f => !f.source || f.source === 'local')
+      const driveFiles = files.filter(f => f.source === 'drive')
+      
+      // Start both uploads in parallel if we have both types
+      const uploadPromises = []
+      
+      if (localFiles.length > 0) {
+        uploadPromises.push(
+          uploadLocalFiles(localFiles, progress, updateFileStatus, setUploadProgress)
+        )
       }
+      
+      if (driveFiles.length > 0) {
+        // Group Drive files by account ID
+        const driveFilesByAccount = new Map<string, FileItem[]>()
+        driveFiles.forEach(file => {
+          const accountId = file.driveAccountId || 'unknown'
+          if (!driveFilesByAccount.has(accountId)) {
+            driveFilesByAccount.set(accountId, [])
+          }
+          driveFilesByAccount.get(accountId)!.push(file)
+        })
+        
+        // Upload each account's files
+        driveFilesByAccount.forEach((accountFiles, accountId) => {
+          uploadPromises.push(
+            uploadGoogleDriveFiles(accountFiles, accountId, progress, updateFileStatus, setUploadProgress)
+          )
+        })
+      }
+      
+      // Wait for all uploads to complete
+      await Promise.all(uploadPromises)
+      
+      // Start backend polling for document status
+      startPollingBackend()
     } catch (error) {
       console.error('Upload failed:', error)
       showToast('Upload failed', 'error')
     } finally {
       setIsUploading(false)
     }
-  }, [files, showToast, updateFileStatus])
+  }, [files, showToast, updateFileStatus, startPollingBackend])
 
   return {
     files,
     isUploading,
     uploadProgress,
     addFiles,
+    addDriveFiles,
     removeFile,
     clearFiles,
     startUpload
@@ -462,6 +528,7 @@ const uploadLocalFiles = async (
 
 const uploadGoogleDriveFiles = async (
   files: FileItem[],
+  accountId: string,
   progress: UploadProgress,
   updateFileStatus: (
     id: string, 
@@ -469,69 +536,91 @@ const uploadGoogleDriveFiles = async (
     progress?: number, 
     error?: string,
     stage?: DocumentProgressStage,
-    stageMessage?: string
+    stageMessage?: string,
+    documentId?: string
   ) => void,
   setUploadProgress: (progress: UploadProgress) => void
 ) => {
-  // Extract file IDs from Google Drive files
-  const fileIds = files.map(f => f.id) // Assuming ID is the Google Drive file ID
-
-  let completedCount = 0
-  let failedCount = 0
-
+  // Use streaming upload for consistent progress updates
+  const { googleService } = await import('../services/googleService')
+  const fileIds = files.map(f => f.driveFileId!).filter(Boolean)
+  
+  // Track which files have been marked as completed/failed to avoid duplication
+  const completedFiles = new Set<string>()
+  const failedFiles = new Set<string>()
+  
   try {
-    const response = await fetch('http://localhost:8000/documents/upload/drive', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        file_ids: fileIds
-      })
+    // Initialize all files as uploading
+    files.forEach(fileItem => {
+      updateFileStatus(fileItem.id, 'uploading', 0, undefined, 'initializing', 'Preparing to download from Drive...')
     })
 
-    if (!response.ok) {
-      throw new Error(`Google Drive upload failed: ${response.statusText}`)
-    }
+    // Stream progress updates
+    for await (const event of googleService.downloadDriveFilesStream(accountId, fileIds)) {
+      const { file_progress, current_file_index } = event
+      const fileItem = files[current_file_index]
+      
+      if (!fileItem) continue
 
-    const result = await response.json()
-    
-    // Update progress based on results
-    result.results.forEach((result: any, index: number) => {
-      const fileItem = files[index]
-      if (result.success) {
-        updateFileStatus(fileItem.id, 'completed', 100, undefined, 'completed', 'Document ready')
-        completedCount++
-      } else {
-        updateFileStatus(fileItem.id, 'failed', 0, result.error, 'failed', 'Processing failed')
-        failedCount++
+      // Map status from stage
+      let status: FileItem['status'] = 'processing'
+      
+      // Only increment counters once per file
+      if (file_progress.stage === 'completed' && !completedFiles.has(fileItem.id)) {
+        status = 'completed'
+        completedFiles.add(fileItem.id)
+      } else if (file_progress.stage === 'failed' && !failedFiles.has(fileItem.id)) {
+        status = 'failed'
+        failedFiles.add(fileItem.id)
       }
-    })
+
+      // Update file status with stage information and document ID
+      updateFileStatus(
+        fileItem.id,
+        status,
+        file_progress.progress_percent,
+        file_progress.error,
+        file_progress.stage as DocumentProgressStage,
+        file_progress.message,
+        file_progress.document_id
+      )
+
+      // Update overall progress with tracked counters
+      setUploadProgress({ 
+        ...progress, 
+        completed: completedFiles.size,
+        failed: failedFiles.size,
+        current: file_progress.filename,
+        files: [...files]
+      })
+    }
 
     setUploadProgress({ 
       ...progress, 
-      completed: completedCount, 
-      failed: failedCount,
+      completed: completedFiles.size,
+      failed: failedFiles.size,
       files: [...files]
     })
   } catch (error) {
-    // Mark all files as failed
+    // Mark remaining files as failed
     files.forEach(fileItem => {
-      updateFileStatus(
-        fileItem.id, 
-        'failed', 
-        0, 
-        error instanceof Error ? error.message : 'Upload failed',
-        'failed',
-        'Processing failed'
-      )
-      failedCount++
+      if (fileItem.status !== 'completed' && !failedFiles.has(fileItem.id)) {
+        updateFileStatus(
+          fileItem.id, 
+          'failed', 
+          0, 
+          error instanceof Error ? error.message : 'Upload failed',
+          'failed',
+          'Processing failed'
+        )
+        failedFiles.add(fileItem.id)
+      }
     })
     
     setUploadProgress({ 
       ...progress, 
-      completed: completedCount, 
-      failed: failedCount,
+      completed: completedFiles.size,
+      failed: failedFiles.size,
       files: [...files]
     })
     throw error

@@ -1,5 +1,5 @@
 import React from 'react'
-import { X, FileText, Image, File, CheckCircle, XCircle } from 'lucide-react'
+import { X, FileText, Image, File, CheckCircle, XCircle, Computer, Cloud } from 'lucide-react'
 
 interface FileItem {
   id: string
@@ -7,6 +7,9 @@ interface FileItem {
   status?: 'pending' | 'uploading' | 'processing' | 'completed' | 'failed'
   progress?: number
   error?: string
+  source?: 'local' | 'drive'
+  sourceAccount?: string  // Email for display
+  driveAccountId?: string // Account ID for API calls (not displayed)
 }
 
 interface FileListProps {
@@ -99,14 +102,36 @@ const FileList: React.FC<FileListProps> = ({
             {getFileIcon(fileItem.file)}
             
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-gray-900 dark:text-white truncate">
-                {fileItem.file.name}
-              </p>
-              <div className="flex items-center space-x-2 mt-1">
-                <span className="text-xs text-gray-500 dark:text-gray-400">
-                  {formatFileSize(fileItem.file.size)}
+              <div className="flex items-center space-x-2">
+                {/* Source indicator */}
+                <span title={fileItem.source === 'drive' ? 'Google Drive' : 'Local file'}>
+                  {fileItem.source === 'drive' ? (
+                    <Cloud className="w-4 h-4 text-blue-500 flex-shrink-0" />
+                  ) : (
+                    <Computer className="w-4 h-4 text-gray-500 flex-shrink-0" />
+                  )}
                 </span>
-                <span className="text-xs text-gray-400">•</span>
+                <p className="text-sm font-medium text-gray-900 dark:text-white truncate">
+                  {fileItem.file.name}
+                </p>
+              </div>
+              <div className="flex items-center space-x-2 mt-1">
+                {fileItem.file.size > 0 && (
+                  <>
+                    <span className="text-xs text-gray-500 dark:text-gray-400">
+                      {formatFileSize(fileItem.file.size)}
+                    </span>
+                    <span className="text-xs text-gray-400">•</span>
+                  </>
+                )}
+                {fileItem.source === 'drive' && fileItem.sourceAccount && (
+                  <>
+                    <span className="text-xs text-gray-500 dark:text-gray-400">
+                      Drive - {fileItem.sourceAccount}
+                    </span>
+                    <span className="text-xs text-gray-400">•</span>
+                  </>
+                )}
                 <span className={`text-xs ${getStatusColor(fileItem.status)}`}>
                   {getStatusText(fileItem.status)}
                 </span>

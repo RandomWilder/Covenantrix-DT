@@ -20,7 +20,7 @@ API Key Resolution (Strict Mode):
   
   Missing keys result in service = None (graceful degradation).
 """
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
 from pydantic import Field, field_validator
 from typing import Optional
 from pathlib import Path
@@ -49,6 +49,14 @@ def get_user_data_directory() -> Path:
 
 class Settings(BaseSettings):
     """Main application settings - all fields at top level for proper .env loading"""
+    
+    # Pydantic Settings v2 configuration
+    model_config = SettingsConfigDict(
+        env_file=str(Path(__file__).parent.parent / ".env"),
+        env_file_encoding='utf-8',
+        case_sensitive=False,
+        extra='ignore'
+    )
     
     # App metadata
     app_name: str = "Covenantrix"
@@ -102,9 +110,9 @@ class Settings(BaseSettings):
     ocr_preferred_language: Optional[str] = Field(None, env="OCR_PREFERRED_LANGUAGE")  # None = auto-detect
     
     # Google OAuth configuration
-    google_oauth_client_id: Optional[str] = Field(None, env="GOOGLE_CLIENT_ID")
-    google_oauth_client_secret: Optional[str] = Field(None, env="GOOGLE_CLIENT_SECRET")
-    google_oauth_redirect_uri: str = Field("http://localhost:3000/oauth/callback", env="GOOGLE_REDIRECT_URI")
+    google_oauth_client_id: Optional[str] = Field(default=None, validation_alias="GOOGLE_CLIENT_ID")
+    google_oauth_client_secret: Optional[str] = Field(default=None, validation_alias="GOOGLE_CLIENT_SECRET")
+    google_oauth_redirect_uri: str = Field(default="http://localhost:8000/oauth/callback", validation_alias="GOOGLE_REDIRECT_URI")
     
     # External API configuration
     numbeo_api_key: Optional[str] = Field(None, env="NUMBEO_API_KEY")
@@ -233,11 +241,6 @@ class Settings(BaseSettings):
                 self.google_maps_api_key = parent.google_maps_api_key
         
         return ExternalAPIsConfig(self)
-    
-    class Config:
-        env_file = ".env"
-        case_sensitive = False
-        extra = "ignore"
 
 
 # Global settings instance

@@ -16,6 +16,7 @@ const UploadScreen: React.FC = () => {
     uploadProgress,
     isUploading,
     addFiles,
+    addDriveFiles,
     removeFile,
     startUpload,
     clearFiles
@@ -25,17 +26,12 @@ const UploadScreen: React.FC = () => {
     addFiles(selectedFiles)
   }
 
-  const handleGoogleDriveFiles = (fileIds: string[]) => {
-    // This will be handled by the GoogleDriveSelector component
-    console.log('Google Drive files selected:', fileIds)
+  const handleAddDriveFiles = (files: Array<{id: string; name: string}>, accountId: string, accountEmail: string) => {
+    addDriveFiles(files, accountId, accountEmail)
   }
 
   const handleStartUpload = async () => {
-    if (activeTab === 'local') {
-      await startUpload('local')
-    } else {
-      await startUpload('drive')
-    }
+    await startUpload()
   }
 
   const handleGoToSettings = () => {
@@ -116,27 +112,28 @@ const UploadScreen: React.FC = () => {
 
       {/* Main Content */}
       <div className="flex-1 p-6">
-        {activeTab === 'local' ? (
-          <div className="space-y-6">
+        <div className="space-y-6">
+          {activeTab === 'local' ? (
             <FileUploadArea
               onFilesSelected={handleFilesSelected}
               disabled={isUploading || !uploadAvailable}
             />
-            
-            {files.length > 0 && !isUploading && (
-              <FileList
-                files={files}
-                onRemoveFile={removeFile}
-                disabled={isUploading || !uploadAvailable}
-              />
-            )}
-          </div>
-        ) : (
-          <GoogleDriveSelector
-            onFilesSelected={handleGoogleDriveFiles}
-            disabled={isUploading}
-          />
-        )}
+          ) : (
+            <GoogleDriveSelector
+              onAddToQueue={handleAddDriveFiles}
+              disabled={isUploading || !uploadAvailable}
+            />
+          )}
+          
+          {/* Unified FileList - shows all files regardless of source */}
+          {files.length > 0 && !isUploading && (
+            <FileList
+              files={files}
+              onRemoveFile={removeFile}
+              disabled={isUploading || !uploadAvailable}
+            />
+          )}
+        </div>
       </div>
 
       {/* Upload Progress */}

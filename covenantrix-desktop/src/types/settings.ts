@@ -45,12 +45,30 @@ export interface PrivacySettings {
   retain_history: boolean;
 }
 
+export interface ProfileSettings {
+  first_name?: string;
+  last_name?: string;
+  email?: string;
+}
+
+export interface GoogleAccountSettings {
+  account_id: string;
+  email: string;
+  display_name?: string;
+  status: string;
+  connected_at: string;
+  last_used: string;
+  scopes: string[];
+}
+
 export interface UserSettings {
   api_keys: ApiKeySettings;
   rag: RAGSettings;
   language: LanguageSettings;
   ui: UISettings;
   privacy: PrivacySettings;
+  profile?: ProfileSettings;
+  google_accounts?: GoogleAccountSettings[];
   version: string;
   last_updated?: string;
 }

@@ -6,6 +6,7 @@ import UploadScreen from '../../features/upload/UploadScreen'
 import DocumentsScreen from '../../features/documents/DocumentsScreen'
 import { ChatScreen } from '../../features/chat/ChatScreen'
 import { ChatProvider } from '../../contexts/ChatContext'
+import ProfileModal from '../../features/profile/ProfileModal'
 
 interface AppLayoutProps {
   children?: React.ReactNode
@@ -13,6 +14,7 @@ interface AppLayoutProps {
 
 const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
   const [activeScreen, setActiveScreen] = useState<string>('dashboard')
+  const [isProfileModalOpen, setIsProfileModalOpen] = useState(false)
 
   const renderContent = () => {
     switch (activeScreen) {
@@ -45,16 +47,22 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
 
   return (
     <div className="app-window flex flex-col">
-      <Header />
+      <Header onProfileClick={() => setIsProfileModalOpen(true)} />
       <div className="flex flex-1 overflow-hidden">
         <Sidebar onNavigate={setActiveScreen} activeScreen={activeScreen} />
         <main className="main-content flex-1 flex flex-col">
           <div className="flex-1 overflow-auto">
             {renderContent()}
           </div>
-          <StatusBar />
+          <StatusBar onProfileClick={() => setIsProfileModalOpen(true)} />
         </main>
       </div>
+      
+      {/* Profile Modal */}
+      <ProfileModal 
+        isOpen={isProfileModalOpen} 
+        onClose={() => setIsProfileModalOpen(false)} 
+      />
     </div>
   )
 }

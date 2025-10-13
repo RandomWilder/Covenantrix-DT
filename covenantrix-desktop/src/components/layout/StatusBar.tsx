@@ -1,7 +1,11 @@
 import React from 'react'
-import { Wifi, Battery, Clock } from 'lucide-react'
+import { Wifi, Battery, Clock, User } from 'lucide-react'
 
-const StatusBar: React.FC = () => {
+interface StatusBarProps {
+  onProfileClick?: () => void;
+}
+
+const StatusBar: React.FC<StatusBarProps> = ({ onProfileClick }) => {
   const currentTime = new Date().toLocaleTimeString([], { 
     hour: '2-digit', 
     minute: '2-digit' 
@@ -26,8 +30,15 @@ const StatusBar: React.FC = () => {
           <span>{currentTime}</span>
         </div>
         <div className="text-xs">
-          Covenantrix v1.1.6
+          Covenantrix v1.1.7
         </div>
+        <button
+          onClick={onProfileClick}
+          className="p-1.5 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+          title="Profile & Settings"
+        >
+          <User className="w-4 h-4" />
+        </button>
       </div>
     </div>
   )

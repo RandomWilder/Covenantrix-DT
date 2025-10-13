@@ -3,7 +3,7 @@ Settings API Schemas
 User settings and configuration management
 """
 from pydantic import BaseModel, Field, field_validator, model_validator
-from typing import Optional, Literal
+from typing import Optional, Literal, List
 from enum import Enum
 
 
@@ -118,6 +118,29 @@ class PrivacySettings(BaseModel):
     retain_history: bool = Field(default=True, description="Retain chat history")
 
 
+class ProfileSettings(BaseModel):
+    """User profile information"""
+    first_name: Optional[str] = None
+    last_name: Optional[str] = None
+    email: Optional[str] = None
+
+
+class GoogleAccountSettings(BaseModel):
+    """Google OAuth account (stored format)"""
+    account_id: str
+    email: str
+    display_name: Optional[str] = None
+    provider: str = "google"
+    status: str  # connected/expired/revoked
+    connected_at: str  # ISO datetime
+    last_used: str  # ISO datetime
+    # Credentials stored encrypted
+    access_token: str
+    refresh_token: Optional[str] = None
+    token_expiry: str  # ISO datetime
+    scopes: List[str]
+
+
 class UserSettings(BaseModel):
     """Complete user settings"""
     api_keys: ApiKeySettings = Field(default_factory=ApiKeySettings, description="API key settings")
@@ -125,6 +148,8 @@ class UserSettings(BaseModel):
     language: LanguageSettings = Field(default_factory=LanguageSettings, description="Language preferences")
     ui: UISettings = Field(default_factory=UISettings, description="UI settings")
     privacy: PrivacySettings = Field(default_factory=PrivacySettings, description="Privacy settings")
+    profile: ProfileSettings = Field(default_factory=ProfileSettings, description="User profile information")
+    google_accounts: List[GoogleAccountSettings] = Field(default_factory=list, description="Connected Google accounts")
     version: str = Field(default="1.0", description="Settings schema version")
     last_updated: Optional[str] = Field(default=None, description="Last update timestamp")
 

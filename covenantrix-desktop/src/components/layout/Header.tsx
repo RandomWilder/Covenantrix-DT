@@ -2,7 +2,11 @@ import React, { useState } from 'react'
 import { Search, Settings, Bell, User } from 'lucide-react'
 import SettingsModal from '../../features/settings/SettingsModal'
 
-const Header: React.FC = () => {
+interface HeaderProps {
+  onProfileClick?: () => void
+}
+
+const Header: React.FC<HeaderProps> = ({ onProfileClick }) => {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
   
   const handleSettingsClick = () => {
@@ -43,7 +47,10 @@ const Header: React.FC = () => {
         >
           <Settings className="w-5 h-5" />
         </button>
-        <button className="p-2 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors">
+        <button 
+          onClick={onProfileClick}
+          className="p-2 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors no-drag"
+        >
           <User className="w-5 h-5" />
         </button>
       </div>

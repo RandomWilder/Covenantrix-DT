@@ -47,13 +47,23 @@ class UserSettingsStorage:
                 data = json.load(f)
             
             # Handle settings migration if needed
-            data = await self._migrate_settings(data)
+            migrated_data, needs_save = await self._migrate_settings(data)
+            
+            # Save if migration added new fields
+            if needs_save:
+                logger.info("Saving migrated settings to disk")
+                # We need to save the migrated data before decryption
+                # Create a copy for saving with encryption
+                save_data = migrated_data.copy()
+                save_data = await self._encrypt_sensitive_data(save_data)
+                with open(self.storage_path, 'w', encoding='utf-8') as f:
+                    json.dump(save_data, f, indent=2, ensure_ascii=False)
             
             # Decrypt sensitive data (API keys)
-            data = await self._decrypt_sensitive_data(data)
+            migrated_data = await self._decrypt_sensitive_data(migrated_data)
             
             # Create settings object
-            settings = UserSettings(**data)
+            settings = UserSettings(**migrated_data)
             
             logger.info("Settings loaded successfully")
             return settings
@@ -104,7 +114,7 @@ class UserSettingsStorage:
         await self.save_settings(default_settings)
         return default_settings
     
-    async def _migrate_settings(self, data: Dict[str, Any]) -> Dict[str, Any]:
+    async def _migrate_settings(self, data: Dict[str, Any]) -> tuple[Dict[str, Any], bool]:
         """
         Migrate settings from older versions
         
@@ -112,14 +122,16 @@ class UserSettingsStorage:
             data: Raw settings data
             
         Returns:
-            Migrated settings data
+            Tuple of (migrated settings data, needs_save flag)
         """
         try:
             version = data.get("version", "0.0")
+            needs_save = False
             
             # Version 1.0 migration
             if version == "0.0":
                 logger.info("Migrating settings from version 0.0 to 1.0")
+                needs_save = True
                 
                 # Add default structure if missing
                 if "api_keys" not in data:
@@ -161,12 +173,28 @@ class UserSettingsStorage:
                 
                 data["version"] = "1.0"
             
-            return data
+            # Add profile section if missing (even for v1.0 settings)
+            if "profile" not in data:
+                logger.info("Adding profile section to settings")
+                data["profile"] = {
+                    "first_name": None,
+                    "last_name": None,
+                    "email": None
+                }
+                needs_save = True
+            
+            # Add google_accounts section if missing (even for v1.0 settings)
+            if "google_accounts" not in data:
+                logger.info("Adding google_accounts section to settings")
+                data["google_accounts"] = []
+                needs_save = True
+            
+            return data, needs_save
             
         except Exception as e:
             logger.error(f"Settings migration failed: {e}")
             # Return data as-is if migration fails
-            return data
+            return data, False
     
     async def _encrypt_sensitive_data(self, settings_dict: Dict[str, Any]) -> Dict[str, Any]:
         """
@@ -191,6 +219,14 @@ class UserSettingsStorage:
                 
                 if api_keys.get("google"):
                     api_keys["google"] = self.api_key_manager.encrypt_key(api_keys["google"])
+            
+            # Encrypt Google account credentials
+            if "google_accounts" in settings_dict:
+                for account in settings_dict["google_accounts"]:
+                    if "access_token" in account and account["access_token"]:
+                        account["access_token"] = self.api_key_manager.encrypt_key(account["access_token"])
+                    if "refresh_token" in account and account["refresh_token"]:
+                        account["refresh_token"] = self.api_key_manager.encrypt_key(account["refresh_token"])
             
             return settings_dict
             
@@ -235,6 +271,23 @@ class UserSettingsStorage:
                         api_keys["google"] = self.api_key_manager.decrypt_key(api_keys["google"])
                     except Exception as e:
                         logger.warning(f"Failed to decrypt Google key, assuming plain text: {e}")
+            
+            # Decrypt Google account credentials
+            if "google_accounts" in settings_dict:
+                for account in settings_dict["google_accounts"]:
+                    # Decrypt access_token
+                    if "access_token" in account and account["access_token"]:
+                        try:
+                            account["access_token"] = self.api_key_manager.decrypt_key(account["access_token"])
+                        except Exception as e:
+                            logger.warning(f"Failed to decrypt access_token, assuming plain text: {e}")
+                    
+                    # Decrypt refresh_token
+                    if "refresh_token" in account and account["refresh_token"]:
+                        try:
+                            account["refresh_token"] = self.api_key_manager.decrypt_key(account["refresh_token"])
+                        except Exception as e:
+                            logger.warning(f"Failed to decrypt refresh_token, assuming plain text: {e}")
             
             return settings_dict
             

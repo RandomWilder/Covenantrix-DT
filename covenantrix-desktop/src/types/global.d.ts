@@ -95,6 +95,10 @@ declare global {
       getStoragePath: () => Promise<string>;
       validateStorageDirectory: () => Promise<any>;
       
+      // Google OAuth
+      startGoogleOAuth: () => Promise<void>;
+      onOAuthCallback: (callback: (data: { code: string; state: string }) => void) => void;
+      
       // Event listeners
       onDocumentProcessed: (callback: (event: any, data: any) => void) => void;
       onSettingsChanged: (callback: (event: any, data: any) => void) => void;

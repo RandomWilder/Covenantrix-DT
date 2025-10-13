@@ -35,6 +35,12 @@ export const getDefaultSettings = (): UserSettings => {
       enable_cloud_backup: false,
       retain_history: true
     },
+    profile: {
+      first_name: undefined,
+      last_name: undefined,
+      email: undefined
+    },
+    google_accounts: [],
     version: '1.0',
     last_updated: new Date().toISOString()
   };
@@ -75,6 +81,12 @@ export const validateAndNormalizeSettings = (settings: any): UserSettings => {
       enable_cloud_backup: settings?.privacy?.enable_cloud_backup ?? defaults.privacy.enable_cloud_backup,
       retain_history: settings?.privacy?.retain_history ?? defaults.privacy.retain_history
     },
+    profile: {
+      first_name: settings?.profile?.first_name,
+      last_name: settings?.profile?.last_name,
+      email: settings?.profile?.email
+    },
+    google_accounts: Array.isArray(settings?.google_accounts) ? settings.google_accounts : [],
     version: settings?.version || defaults.version,
     last_updated: settings?.last_updated || new Date().toISOString()
   };

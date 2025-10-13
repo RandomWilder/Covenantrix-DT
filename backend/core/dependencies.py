@@ -19,7 +19,10 @@ from infrastructure.storage.lightrag_storage import LightRAGStorage
 from infrastructure.storage.analytics_storage import AnalyticsStorage
 from infrastructure.storage.document_registry import DocumentRegistry
 from infrastructure.storage.chat_storage import ChatStorage
+from infrastructure.storage.user_settings_storage import UserSettingsStorage
 from domain.integrations.ocr import OCRService
+from domain.integrations.google_oauth import GoogleOAuthService
+from infrastructure.external.google_api import GoogleAPIService
 
 logger = logging.getLogger(__name__)
 
@@ -35,6 +38,8 @@ _agent_registry: Optional['AgentRegistry'] = None
 _agent_data_access: Optional[AgentDataAccessService] = None
 _external_data_service: Optional[ExternalDataService] = None
 _ocr_service: Optional[OCRService] = None
+_user_settings_storage: Optional[UserSettingsStorage] = None
+_oauth_service: Optional[GoogleOAuthService] = None
 
 
 def set_rag_engine(rag_engine: Optional[RAGEngine]) -> None:
@@ -147,6 +152,42 @@ def get_chat_storage(
     if _chat_storage is None:
         _chat_storage = ChatStorage(settings.storage.working_dir)
     return _chat_storage
+
+
+def get_user_settings_storage(
+    settings: Settings = Depends(get_config)
+) -> UserSettingsStorage:
+    """Get user settings storage instance (singleton)"""
+    global _user_settings_storage
+    if _user_settings_storage is None:
+        _user_settings_storage = UserSettingsStorage()
+    return _user_settings_storage
+
+
+def get_oauth_service(
+    settings: Settings = Depends(get_config),
+    storage: UserSettingsStorage = Depends(get_user_settings_storage)
+) -> GoogleOAuthService:
+    """Get Google OAuth service instance (singleton)"""
+    global _oauth_service
+    if _oauth_service is None:
+        _oauth_service = GoogleOAuthService(config=settings, storage=storage)
+    return _oauth_service
+
+
+def reset_oauth_service() -> None:
+    """Reset OAuth service singleton (called after config reload)"""
+    global _oauth_service
+    _oauth_service = None
+    logger.debug("OAuth service singleton reset")
+
+
+def get_google_api_service(
+    oauth_service: GoogleOAuthService = Depends(get_oauth_service)
+) -> GoogleAPIService:
+    """Get Google API service instance"""
+    # Create new instance with oauth_service for token refresh
+    return GoogleAPIService(oauth_service=oauth_service)
 
 
 # AI service dependencies

@@ -19,6 +19,17 @@ class ContextFilter(logging.Filter):
             record.request_id = 'N/A'
         if not hasattr(record, 'user_id'):
             record.user_id = 'N/A'
+        
+        # Handle Unicode in log messages (e.g., Hebrew filenames)
+        # Ensure message formatting doesn't fail on non-ASCII characters
+        try:
+            if hasattr(record, 'msg') and isinstance(record.msg, str):
+                # Try to encode/decode to catch potential issues early
+                record.msg.encode('utf-8')
+        except Exception:
+            # If there's any encoding issue, replace with safe representation
+            record.msg = repr(record.msg)
+        
         return True
 
 
@@ -44,15 +55,24 @@ def setup_logging(
         datefmt='%Y-%m-%d %H:%M:%S'
     )
     
-    # Console handler
+    # Console handler with UTF-8 encoding for Hebrew/Unicode filenames
     console_handler = logging.StreamHandler(sys.stdout)
+    
+    # Set UTF-8 encoding for the stream to handle non-ASCII characters
+    # This prevents UnicodeEncodeError on Windows console
+    if hasattr(console_handler.stream, 'reconfigure'):
+        try:
+            console_handler.stream.reconfigure(encoding='utf-8', errors='replace')
+        except Exception:
+            pass  # Fallback if reconfigure fails
+    
     console_handler.setFormatter(formatter)
     console_handler.addFilter(ContextFilter())
     
-    # File handler (optional)
+    # File handler (optional) with UTF-8 encoding
     handlers = [console_handler]
     if log_file:
-        file_handler = logging.FileHandler(log_file)
+        file_handler = logging.FileHandler(log_file, encoding='utf-8')
         file_handler.setFormatter(formatter)
         file_handler.addFilter(ContextFilter())
         handlers.append(file_handler)

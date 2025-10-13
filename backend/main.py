@@ -12,12 +12,40 @@ backend_dir = Path(__file__).parent.resolve()
 if str(backend_dir) not in sys.path:
     sys.path.insert(0, str(backend_dir))
 
+# Load .env file FIRST, before any other imports
+# This is critical for pydantic-settings to pick up environment variables
+# override=True ensures .env values take precedence over existing env vars
+from dotenv import load_dotenv
+
+# Explicitly specify .env file path in backend directory
+env_file_path = backend_dir / ".env"
+load_dotenv(dotenv_path=env_file_path, override=True)
+
+# Debug: Log what was loaded (only in dev mode)
+if os.getenv("NODE_ENV") == "development":
+    client_id = os.getenv("GOOGLE_CLIENT_ID")
+    if client_id:
+        print(f"[DEBUG] Loaded GOOGLE_CLIENT_ID: {client_id[:20]}...")
+    else:
+        print(f"[DEBUG] GOOGLE_CLIENT_ID not found in environment")
+    print(f"[DEBUG] .env file path: {env_file_path}")
+    print(f"[DEBUG] .env file exists: {env_file_path.exists()}")
+
 import logging
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from core.config import get_settings
+from core.config import get_settings, reload_settings
+
+# Force reload settings after dotenv is loaded to ensure environment variables are picked up
+# This is critical because Settings might be instantiated during imports above
+reload_settings()
+
+# Reset OAuth service singleton to pick up new config
+from core.dependencies import reset_oauth_service
+reset_oauth_service()
+
 from core.logging_config import setup_logging
 from core.dependencies import set_rag_engine, set_ocr_service
 from api.middleware.error_handler import add_exception_handlers
@@ -26,7 +54,7 @@ from api.middleware.logging import LoggingMiddleware
 # Import routers
 from api.routes import (
     health, documents, queries, analytics,
-    agents, integrations, auth, storage, chat, services
+    agents, integrations, auth, storage, chat, services, google
 )
 from api.routes import settings as settings_router
 
@@ -182,6 +210,7 @@ def create_application() -> FastAPI:
     app.include_router(chat.router)
     app.include_router(settings_router.router)
     app.include_router(services.router)
+    app.include_router(google.router)
     
     return app
 

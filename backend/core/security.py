@@ -118,6 +118,50 @@ class APIKeyManager:
         except Exception as e:
             raise ValueError(f"Failed to decrypt settings: {str(e)}")
     
+    def encrypt_oauth_credentials(self, credentials: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Encrypt OAuth tokens in credential dictionary
+        
+        Args:
+            credentials: Dictionary containing OAuth tokens
+            
+        Returns:
+            Dictionary with encrypted token values
+        """
+        encrypted_creds = credentials.copy()
+        
+        # Encrypt access_token if present
+        if "access_token" in encrypted_creds and encrypted_creds["access_token"]:
+            encrypted_creds["access_token"] = self.encrypt_key(encrypted_creds["access_token"])
+        
+        # Encrypt refresh_token if present
+        if "refresh_token" in encrypted_creds and encrypted_creds["refresh_token"]:
+            encrypted_creds["refresh_token"] = self.encrypt_key(encrypted_creds["refresh_token"])
+        
+        return encrypted_creds
+    
+    def decrypt_oauth_credentials(self, credentials: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Decrypt OAuth tokens in credential dictionary
+        
+        Args:
+            credentials: Dictionary containing encrypted OAuth tokens
+            
+        Returns:
+            Dictionary with decrypted token values
+        """
+        decrypted_creds = credentials.copy()
+        
+        # Decrypt access_token if present
+        if "access_token" in decrypted_creds and decrypted_creds["access_token"]:
+            decrypted_creds["access_token"] = self.decrypt_key(decrypted_creds["access_token"])
+        
+        # Decrypt refresh_token if present
+        if "refresh_token" in decrypted_creds and decrypted_creds["refresh_token"]:
+            decrypted_creds["refresh_token"] = self.decrypt_key(decrypted_creds["refresh_token"])
+        
+        return decrypted_creds
+    
     def validate_api_key_format(self, api_key: str, key_type: str) -> bool:
         """Validate API key format"""
         if not api_key or not isinstance(api_key, str):

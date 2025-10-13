@@ -3,6 +3,7 @@ const path = require('path')
 const fs = require('fs').promises
 const os = require('os')
 const axios = require('axios')
+const { openOAuthWindow } = require('./oauth-handler')
 
 /**
  * IPC Handlers for File Operations
@@ -677,10 +678,33 @@ ipcMain.handle('get-zoom-level', async (event) => {
   }
 })
 
+// Google OAuth handlers
+ipcMain.handle('google-oauth-start', async (event) => {
+  try {
+    // Get the main window from the event sender
+    const mainWindow = require('electron').BrowserWindow.fromWebContents(event.sender);
+    
+    // Call backend to get OAuth URL (use 127.0.0.1 to force IPv4)
+    const response = await axios.post('http://127.0.0.1:8000/api/google/accounts/connect');
+    const { auth_url } = response.data;
+    
+    // Open OAuth window
+    await openOAuthWindow(auth_url, mainWindow);
+    
+    return { success: true };
+  } catch (error) {
+    console.error('Error starting OAuth flow:', error);
+    return { 
+      success: false, 
+      error: error.message || 'Failed to start OAuth flow' 
+    };
+  }
+});
+
 module.exports = {
   // Export handlers for registration in main.js
   registerHandlers: () => {
     // Handlers are already registered above
-    console.log('File operation and settings IPC handlers registered')
+    console.log('File operation, settings, and OAuth IPC handlers registered')
   }
 }
