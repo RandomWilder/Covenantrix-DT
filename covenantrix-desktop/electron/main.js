@@ -116,15 +116,6 @@ async function createWindow() {
   // Set main window for updater
   updateManager.setMainWindow(mainWindow)
 
-  // INSTALLER COMPLETION GUARD: Add delay on first-ever launch
-  // This ensures installer has fully released all file locks before backend starts
-  if (!secureStore.get('app.hasLaunchedBefore', false)) {
-    console.log('First launch detected - waiting for installer to complete...')
-    await new Promise(resolve => setTimeout(resolve, 3000))
-    secureStore.set('app.hasLaunchedBefore', true)
-    console.log('Installer completion wait finished')
-  }
-
   // Start backend before loading the app
   try {
     console.log('Starting backend server...')
