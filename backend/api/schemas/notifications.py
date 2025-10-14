@@ -17,7 +17,7 @@ class NotificationResponse(BaseModel):
     """API response for a single notification."""
     id: str
     type: str
-    source: Literal['local', 'cloud']
+    source: Literal['local', 'cloud', 'subscription']
     title: str
     summary: str
     content: Optional[str] = None
@@ -79,7 +79,7 @@ class CleanupResponse(BaseModel):
 class CreateNotificationRequest(BaseModel):
     """Request to create a new notification."""
     type: str
-    source: Literal['local', 'cloud']
+    source: Literal['local', 'cloud', 'subscription']
     title: str
     summary: str
     content: Optional[str] = None

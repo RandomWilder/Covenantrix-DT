@@ -16,7 +16,7 @@ class Notification:
     """Core notification model."""
     id: str
     type: str
-    source: Literal['local', 'cloud']
+    source: Literal['local', 'cloud', 'subscription']
     title: str
     summary: str
     timestamp: datetime

@@ -7,7 +7,7 @@ export interface NotificationAction {
 export interface Notification {
   id: string;
   type: string;
-  source: 'local' | 'cloud';
+  source: 'local' | 'cloud' | 'subscription';
   title: string;
   summary: string;
   content?: string;
