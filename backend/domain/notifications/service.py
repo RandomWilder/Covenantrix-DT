@@ -60,8 +60,10 @@ class NotificationService:
         return notification
     
     async def get_all_notifications(self) -> List[Notification]:
-        """Retrieve all notifications sorted newest first."""
-        notifications = await self.storage.get_all_notifications()
+        """Retrieve all active (non-dismissed) notifications sorted newest first."""
+        all_notifications = await self.storage.get_all_notifications()
+        # Filter out dismissed notifications
+        notifications = [n for n in all_notifications if not n.dismissed]
         return notifications
     
     async def get_unread_count(self) -> int:

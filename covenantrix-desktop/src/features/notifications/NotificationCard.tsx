@@ -76,7 +76,7 @@ export function NotificationCard({
 
             {/* Expanded content */}
             {isExpanded && notification.content && !notification.downloadProgress?.isDownloading && (
-              <div className="mt-3 mb-3">
+              <div className="mt-3 mb-3 max-h-[200px] overflow-y-auto rounded border border-gray-200 dark:border-gray-700 p-3 bg-gray-50 dark:bg-gray-800/50">
                 <p className="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap">
                   {notification.content}
                 </p>
