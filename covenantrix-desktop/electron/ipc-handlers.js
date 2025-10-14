@@ -4,6 +4,8 @@ const fs = require('fs').promises
 const os = require('os')
 const axios = require('axios')
 const { openOAuthWindow } = require('./oauth-handler')
+const { updateManager } = require('./updater')
+const { autoUpdater } = require('electron-updater')
 
 /**
  * IPC Handlers for File Operations
@@ -714,11 +716,105 @@ ipcMain.handle('google-oauth-start', async (event) => {
   }
 });
 
+// Notification handlers
+function registerNotificationHandlers() {
+  ipcMain.handle('notifications:getAll', async () => {
+    try {
+      const backendUrl = global.backendUrl || 'http://localhost:8000';
+      const response = await axios.get(`${backendUrl}/api/notifications`);
+      return response.data;
+    } catch (error) {
+      console.error('Failed to fetch notifications:', error);
+      return { success: false, error: error.message, notifications: [] };
+    }
+  });
+
+  ipcMain.handle('notifications:getUnreadCount', async () => {
+    try {
+      const backendUrl = global.backendUrl || 'http://localhost:8000';
+      const response = await axios.get(`${backendUrl}/api/notifications/unread-count`);
+      return response.data;
+    } catch (error) {
+      console.error('Failed to fetch unread count:', error);
+      return { success: false, error: error.message, count: 0 };
+    }
+  });
+
+  ipcMain.handle('notifications:markAsRead', async (event, id) => {
+    try {
+      const backendUrl = global.backendUrl || 'http://localhost:8000';
+      const response = await axios.put(`${backendUrl}/api/notifications/${id}/read`);
+      return { success: true, data: response.data };
+    } catch (error) {
+      console.error('Failed to mark notification as read:', error);
+      return { success: false, error: error.message };
+    }
+  });
+
+  ipcMain.handle('notifications:dismiss', async (event, id) => {
+    try {
+      const backendUrl = global.backendUrl || 'http://localhost:8000';
+      const response = await axios.delete(`${backendUrl}/api/notifications/${id}`);
+      return { success: true, data: response.data };
+    } catch (error) {
+      console.error('Failed to dismiss notification:', error);
+      return { success: false, error: error.message };
+    }
+  });
+
+  ipcMain.handle('notifications:cleanup', async () => {
+    try {
+      const backendUrl = global.backendUrl || 'http://localhost:8000';
+      const response = await axios.post(`${backendUrl}/api/notifications/cleanup`);
+      return { success: true, data: response.data };
+    } catch (error) {
+      console.error('Failed to cleanup notifications:', error);
+      return { success: false, error: error.message };
+    }
+  });
+
+  console.log('Notification IPC handlers registered');
+}
+
+// Update action handlers
+function registerUpdateHandlers() {
+  ipcMain.handle('update:download', async () => {
+    try {
+      // Trigger download update
+      await autoUpdater.downloadUpdate();
+      return { success: true };
+    } catch (error) {
+      console.error('Failed to download update:', error);
+      return { success: false, error: error.message };
+    }
+  });
+
+  ipcMain.handle('update:install', async () => {
+    try {
+      const { app } = require('electron');
+      
+      // Remove window-all-closed listener to prevent conflicts during update
+      app.removeAllListeners('window-all-closed');
+      
+      // Quit and install the update
+      autoUpdater.quitAndInstall(false, true);
+      // No return needed - app will quit
+    } catch (error) {
+      console.error('Failed to install update:', error);
+      return { success: false, error: error.message };
+    }
+  });
+
+  console.log('Update action IPC handlers registered');
+}
+
 module.exports = {
   // Export handlers for registration in main.js
   registerHandlers: (getMainWindow) => {
     // Store reference to main window getter
     getMainWindowRef = getMainWindow
     console.log('File operation, settings, and OAuth IPC handlers registered')
-  }
+  },
+  registerNotificationHandlers,
+  registerUpdateHandlers
 }

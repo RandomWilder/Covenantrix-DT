@@ -33,6 +33,7 @@ if os.getenv("NODE_ENV") == "development":
 
 import logging
 from contextlib import asynccontextmanager
+from datetime import datetime, timedelta
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -54,7 +55,7 @@ from api.middleware.logging import LoggingMiddleware
 # Import routers
 from api.routes import (
     health, documents, queries, analytics,
-    agents, integrations, auth, storage, chat, services, google
+    agents, integrations, auth, storage, chat, services, google, notifications
 )
 from api.routes import settings as settings_router
 
@@ -154,6 +155,18 @@ async def lifespan(app: FastAPI):
                 logger.info("[OK] OCR service disabled - no Google API key available")
             else:
                 logger.info("[OK] OCR service disabled - OCR setting disabled")
+        
+        # Cleanup expired notifications on startup
+        from infrastructure.storage.notification_storage import NotificationStorage
+        from domain.notifications.service import NotificationService
+        try:
+            notification_storage = NotificationStorage(settings.storage.working_dir)
+            notification_service = NotificationService(storage=notification_storage)
+            cutoff_date = datetime.now() - timedelta(days=7)
+            deleted_count = await notification_service.cleanup_expired(cutoff_date)
+            logger.info(f"[OK] Notification cleanup: removed {deleted_count} expired notifications")
+        except Exception as cleanup_error:
+            logger.error(f"[WARNING] Notification cleanup failed: {cleanup_error}")
             
     except Exception as e:
         logger.error(f"[ERROR] Startup error: {e}")
@@ -211,6 +224,7 @@ def create_application() -> FastAPI:
     app.include_router(settings_router.router)
     app.include_router(services.router)
     app.include_router(google.router)
+    app.include_router(notifications.router)
     
     return app
 

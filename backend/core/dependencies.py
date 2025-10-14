@@ -20,9 +20,11 @@ from infrastructure.storage.analytics_storage import AnalyticsStorage
 from infrastructure.storage.document_registry import DocumentRegistry
 from infrastructure.storage.chat_storage import ChatStorage
 from infrastructure.storage.user_settings_storage import UserSettingsStorage
+from infrastructure.storage.notification_storage import NotificationStorage
 from domain.integrations.ocr import OCRService
 from domain.integrations.google_oauth import GoogleOAuthService
 from infrastructure.external.google_api import GoogleAPIService
+from domain.notifications.service import NotificationService
 
 logger = logging.getLogger(__name__)
 
@@ -40,6 +42,7 @@ _external_data_service: Optional[ExternalDataService] = None
 _ocr_service: Optional[OCRService] = None
 _user_settings_storage: Optional[UserSettingsStorage] = None
 _oauth_service: Optional[GoogleOAuthService] = None
+_notification_storage: Optional[NotificationStorage] = None
 
 
 def set_rag_engine(rag_engine: Optional[RAGEngine]) -> None:
@@ -162,6 +165,23 @@ def get_user_settings_storage(
     if _user_settings_storage is None:
         _user_settings_storage = UserSettingsStorage()
     return _user_settings_storage
+
+
+def get_notification_storage(
+    settings: Settings = Depends(get_config)
+) -> NotificationStorage:
+    """Get notification storage instance (singleton)"""
+    global _notification_storage
+    if _notification_storage is None:
+        _notification_storage = NotificationStorage(settings.storage.working_dir)
+    return _notification_storage
+
+
+def get_notification_service(
+    storage: NotificationStorage = Depends(get_notification_storage)
+) -> NotificationService:
+    """Get notification service instance"""
+    return NotificationService(storage=storage)
 
 
 def get_oauth_service(

@@ -1,6 +1,8 @@
 import React, { useState } from 'react'
 import { Search, Settings, Bell, User } from 'lucide-react'
 import SettingsModal from '../../features/settings/SettingsModal'
+import { NotificationModal } from '../../features/notifications/NotificationModal'
+import { useNotifications } from '../../contexts/NotificationContext'
 
 interface HeaderProps {
   onProfileClick?: () => void
@@ -8,6 +10,8 @@ interface HeaderProps {
 
 const Header: React.FC<HeaderProps> = ({ onProfileClick }) => {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
+  const [isNotificationModalOpen, setIsNotificationModalOpen] = useState(false)
+  const { unreadCount } = useNotifications()
   
   const handleSettingsClick = () => {
     setIsSettingsOpen(true);
@@ -38,8 +42,17 @@ const Header: React.FC<HeaderProps> = ({ onProfileClick }) => {
       </div>
 
       <div className="flex items-center space-x-4">
-        <button className="p-2 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors">
+        <button 
+          onClick={() => setIsNotificationModalOpen(true)}
+          className="relative p-2 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors no-drag"
+        >
           <Bell className="w-5 h-5" />
+          {unreadCount > 0 && (
+            <span className="absolute top-1 right-1 flex h-4 w-4 items-center justify-center">
+              <span className="absolute inline-flex h-full w-full rounded-full bg-red-500 opacity-75 animate-ping"></span>
+              <span className="relative inline-flex rounded-full h-3 w-3 bg-red-500 border border-white dark:border-gray-900"></span>
+            </span>
+          )}
         </button>
         <button 
           onClick={handleSettingsClick}
@@ -58,6 +71,11 @@ const Header: React.FC<HeaderProps> = ({ onProfileClick }) => {
       <SettingsModal 
         isOpen={isSettingsOpen} 
         onClose={() => setIsSettingsOpen(false)} 
+      />
+      
+      <NotificationModal
+        isOpen={isNotificationModalOpen}
+        onClose={() => setIsNotificationModalOpen(false)}
       />
     </header>
   )

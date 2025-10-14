@@ -43,6 +43,40 @@ contextBridge.exposeInMainWorld('electronAPI', {
   startGoogleOAuth: () => ipcRenderer.invoke('google-oauth-start'),
   onOAuthCallback: (callback) => ipcRenderer.on('oauth-callback', (event, data) => callback(data)),
   
+  // Notifications
+  notifications: {
+    getAll: () => ipcRenderer.invoke('notifications:getAll'),
+    getUnreadCount: () => ipcRenderer.invoke('notifications:getUnreadCount'),
+    markAsRead: (id) => ipcRenderer.invoke('notifications:markAsRead', id),
+    dismiss: (id) => ipcRenderer.invoke('notifications:dismiss', id),
+    cleanup: () => ipcRenderer.invoke('notifications:cleanup')
+  },
+  
+  // Update actions
+  update: {
+    download: () => ipcRenderer.invoke('update:download'),
+    install: () => ipcRenderer.invoke('update:install')
+  },
+  
+  // Update notification event listeners
+  onUpdateNotificationCreated: (callback) => {
+    const handler = () => callback();
+    ipcRenderer.on('update-notification-created', handler);
+    return () => ipcRenderer.removeListener('update-notification-created', handler);
+  },
+  onUpdateReadyNotificationCreated: (callback) => {
+    const handler = () => callback();
+    ipcRenderer.on('update-ready-notification-created', handler);
+    return () => ipcRenderer.removeListener('update-ready-notification-created', handler);
+  },
+  
+  // Update status event listener (for download progress)
+  onUpdateStatus: (callback) => {
+    const handler = (event, data) => callback(data);
+    ipcRenderer.on('update-status', handler);
+    return () => ipcRenderer.removeListener('update-status', handler);
+  },
+  
   // Event listeners
   onDocumentProcessed: (callback) => ipcRenderer.on('document-processed', callback),
   onSettingsChanged: (callback) => ipcRenderer.on('settings-changed', callback),

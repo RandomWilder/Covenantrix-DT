@@ -6,6 +6,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { UserSettings, SettingsContextValue, SettingsError } from '../types/settings';
 import type { ServiceStatus } from '../types/services';
+import { isElectron, envLog, envWarn } from '../utils/environment';
 
 const SettingsContext = createContext<SettingsContextValue | undefined>(undefined);
 
@@ -21,32 +22,47 @@ export const SettingsProvider: React.FC<SettingsProviderProps> = ({ children }) 
 
   // Load settings on mount
   useEffect(() => {
+    if (!isElectron()) {
+      envLog('SettingsContext: Running in browser mode, using default settings');
+      const defaultSettings = getDefaultSettings();
+      setSettings(defaultSettings);
+      setIsLoading(false);
+      return;
+    }
     loadSettings();
   }, []);
 
   const loadSettings = useCallback(async () => {
+    if (!isElectron()) {
+      envWarn('loadSettings: Not in Electron environment, using defaults');
+      const defaultSettings = getDefaultSettings();
+      setSettings(defaultSettings);
+      setIsLoading(false);
+      return;
+    }
+
     try {
       setIsLoading(true);
-      console.log('Loading settings...');
+      envLog('Loading settings...');
       const response = await window.electronAPI.getSettings();
-      console.log('Settings response:', response);
+      envLog('Settings response:', response);
       
       if (response.success) {
-        console.log('Settings loaded successfully:', response.settings);
+        envLog('Settings loaded successfully:', response.settings);
         const validatedSettings = validateAndNormalizeSettings(response.settings);
-        console.log('Validated settings:', validatedSettings);
+        envLog('Validated settings:', validatedSettings);
         setSettings(validatedSettings);
       } else {
         console.error('Failed to load settings:', response.error);
         // Set default settings if loading fails
         const defaultSettings = getDefaultSettings();
-        console.log('Using default settings:', defaultSettings);
+        envLog('Using default settings:', defaultSettings);
         setSettings(defaultSettings);
       }
     } catch (error) {
       console.error('Error loading settings:', error);
       const defaultSettings = getDefaultSettings();
-      console.log('Using default settings due to error:', defaultSettings);
+      envLog('Using default settings due to error:', defaultSettings);
       setSettings(defaultSettings);
     } finally {
       setIsLoading(false);
@@ -54,6 +70,18 @@ export const SettingsProvider: React.FC<SettingsProviderProps> = ({ children }) 
   }, []);
 
   const updateSettings = useCallback(async (updates: Partial<UserSettings>) => {
+    if (!isElectron()) {
+      envWarn('updateSettings: Not in Electron environment, only updating local state');
+      const updatedSettings = {
+        ...settings,
+        ...updates,
+        last_updated: new Date().toISOString(),
+        version: '1.0'
+      } as UserSettings;
+      setSettings(updatedSettings);
+      return;
+    }
+
     try {
       setIsLoading(true);
       setError(null); // Clear previous errors
@@ -88,9 +116,16 @@ export const SettingsProvider: React.FC<SettingsProviderProps> = ({ children }) 
   }, [settings]);
 
   const resetSettings = useCallback(async () => {
+    const defaultSettings = getDefaultSettings();
+    
+    if (!isElectron()) {
+      envWarn('resetSettings: Not in Electron environment, only resetting local state');
+      setSettings(defaultSettings);
+      return;
+    }
+
     try {
       setIsLoading(true);
-      const defaultSettings = getDefaultSettings();
       
       const response = await window.electronAPI.updateSettings(defaultSettings);
       
@@ -110,6 +145,11 @@ export const SettingsProvider: React.FC<SettingsProviderProps> = ({ children }) 
   const validateApiKeys = useCallback(async (): Promise<boolean> => {
     if (!settings?.api_keys) return false;
     
+    if (!isElectron()) {
+      envWarn('validateApiKeys: Not in Electron environment, returning false');
+      return false;
+    }
+    
     try {
       const response = await window.electronAPI.validateApiKeys(settings.api_keys);
       return response.success;
@@ -120,6 +160,22 @@ export const SettingsProvider: React.FC<SettingsProviderProps> = ({ children }) 
   }, [settings?.api_keys]);
 
   const fetchServiceStatus = useCallback(async () => {
+    if (!isElectron()) {
+      envWarn('fetchServiceStatus: Not in Electron environment, setting unavailable status');
+      setServiceStatus({
+        openai_available: false,
+        cohere_available: false,
+        google_available: false,
+        features: {
+          chat: false,
+          upload: false,
+          reranking: false,
+          ocr: false
+        }
+      });
+      return;
+    }
+
     try {
       const response = await window.electronAPI.getServicesStatus();
       if (response.success && response.data) {
@@ -159,6 +215,11 @@ export const SettingsProvider: React.FC<SettingsProviderProps> = ({ children }) 
   const applySettings = useCallback(async () => {
     if (!settings) return;
     
+    if (!isElectron()) {
+      envWarn('applySettings: Not in Electron environment, skipping');
+      return;
+    }
+    
     try {
       const response = await window.electronAPI.applySettings(settings);
       if (!response.success) {
@@ -167,11 +228,11 @@ export const SettingsProvider: React.FC<SettingsProviderProps> = ({ children }) 
       
       // Check if services were reloaded
       if (response.restart_required) {
-        console.log('Services reload required, notifying user...');
+        envLog('Services reload required, notifying user...');
         // Note: Services will reload automatically, no action needed
         // The backend handles RAG engine reinitialization
       } else if (response.applied_services?.includes('rag_engine_reloaded')) {
-        console.log('Services successfully reloaded with new configuration');
+        envLog('Services successfully reloaded with new configuration');
       }
       
       // Fetch updated service status after applying settings
@@ -188,6 +249,10 @@ export const SettingsProvider: React.FC<SettingsProviderProps> = ({ children }) 
 
   // Fetch service status on mount
   useEffect(() => {
+    if (!isElectron()) {
+      envLog('SettingsContext: Skipping service status fetch in browser mode');
+      return;
+    }
     fetchServiceStatus();
   }, [fetchServiceStatus]);
 

@@ -33,13 +33,22 @@ class UpdateManager {
     });
 
     // Update available
-    autoUpdater.on('update-available', (info) => {
+    autoUpdater.on('update-available', async (info) => {
       log.info('Update available:', info);
       updateCheckInProgress = false;
       this.updateInfo = info;
       
       this.sendStatusToWindow('Update available', info);
-      this.promptUserToDownload(info);
+      
+      // Create notification via backend API
+      try {
+        await this.createUpdateNotification(info, 'update_available');
+        this.sendStatusToWindow('update-notification-created');
+      } catch (error) {
+        log.error('Failed to create notification, falling back to dialog:', error);
+        // Fallback to original dialog method
+        this.promptUserToDownload(info);
+      }
     });
 
     // Update not available
@@ -62,12 +71,21 @@ class UpdateManager {
     });
 
     // Update downloaded
-    autoUpdater.on('update-downloaded', (info) => {
+    autoUpdater.on('update-downloaded', async (info) => {
       log.info('Update downloaded:', info);
       downloadInProgress = false;
       
       this.sendStatusToWindow('Update downloaded', info);
-      this.promptUserToInstall(info);
+      
+      // Create notification via backend API
+      try {
+        await this.createUpdateNotification(info, 'update_ready');
+        this.sendStatusToWindow('update-ready-notification-created');
+      } catch (error) {
+        log.error('Failed to create notification, falling back to dialog:', error);
+        // Fallback to original dialog method
+        this.promptUserToInstall(info);
+      }
     });
 
     // Error occurred
@@ -88,6 +106,120 @@ class UpdateManager {
   sendStatusToWindow(status, data = null) {
     if (this.mainWindow && this.mainWindow.webContents) {
       this.mainWindow.webContents.send('update-status', { status, data });
+    }
+  }
+
+  /**
+   * Format bytes to MB string
+   * @param {number} bytes - Bytes to format
+   * @returns {string} Formatted string (e.g., "145.8 MB")
+   */
+  formatBytes(bytes) {
+    if (bytes == null || bytes === undefined) {
+      return 'Unknown';
+    }
+    const mb = bytes / 1024 / 1024;
+    return `${mb.toFixed(2)} MB`;
+  }
+
+  /**
+   * Format release notes with version comparison and download size
+   * @param {object} info - Update info from autoUpdater
+   * @returns {string} Formatted markdown string
+   */
+  formatReleaseNotes(info) {
+    // Extract release notes (may be string or HTML)
+    let notes = info.releaseNotes || 'No release notes available';
+    
+    // Strip HTML tags if present
+    if (typeof notes === 'string') {
+      notes = notes.replace(/<[^>]*>/g, '');
+    }
+
+    // Get download size from first file
+    const downloadSize = info.files && info.files[0] 
+      ? this.formatBytes(info.files[0].size) 
+      : 'Unknown';
+
+    // Format structure
+    const formatted = `**Current Version:** ${app.getVersion()}\n**New Version:** ${info.version}\n\n**Release Notes:**\n${notes}\n\n**Download Size:** ${downloadSize}`;
+    
+    return formatted;
+  }
+
+  /**
+   * Create update notification via backend API
+   * @param {object} info - Update info from autoUpdater
+   * @param {string} notificationType - 'update_available' or 'update_ready'
+   */
+  async createUpdateNotification(info, notificationType) {
+    const backendUrl = global.backendUrl || 'http://localhost:8000';
+    const currentVersion = app.getVersion();
+
+    let notificationData;
+
+    if (notificationType === 'update_available') {
+      // Update Available Notification
+      notificationData = {
+        type: 'version_update',
+        source: 'local',
+        title: `Version ${info.version} Available`,
+        summary: `Update to Covenantrix ${info.version}`,
+        content: this.formatReleaseNotes(info),
+        actions: [
+          { label: 'Download Now', action: 'download_update' },
+          { label: 'Later', action: 'dismiss' }
+        ],
+        metadata: {
+          version: info.version,
+          current_version: currentVersion,
+          release_date: info.releaseDate || new Date().toISOString().split('T')[0],
+          download_size: info.files && info.files[0] ? info.files[0].size : null,
+          dedup_key: `version_update_${info.version}`
+        }
+      };
+    } else if (notificationType === 'update_ready') {
+      // Update Ready Notification
+      notificationData = {
+        type: 'version_ready',
+        source: 'local',
+        title: 'Update Ready to Install',
+        summary: `Version ${info.version} is ready`,
+        content: `Covenantrix ${info.version} has been downloaded and is ready to install.\n\nThe application will restart to complete the update.\n\nClick 'Restart Now' when ready.`,
+        actions: [
+          { label: 'Restart Now', action: 'install_update' },
+          { label: 'Later', action: 'dismiss' }
+        ],
+        metadata: {
+          version: info.version,
+          current_version: currentVersion,
+          dedup_key: `version_ready_${info.version}`
+        }
+      };
+    } else {
+      throw new Error(`Unknown notification type: ${notificationType}`);
+    }
+
+    // Call backend API
+    try {
+      const response = await fetch(`${backendUrl}/api/notifications`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(notificationData)
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to create notification: ${response.status} ${response.statusText}`);
+      }
+
+      const result = await response.json();
+      log.info(`Notification created successfully: ${notificationType}`, result);
+      return result;
+    } catch (error) {
+      log.error(`Failed to create notification: ${notificationType}`, error);
+      throw error;
     }
   }
 
@@ -115,6 +247,10 @@ class UpdateManager {
     }
   }
 
+  /**
+   * Fallback method: Dialog prompt for download (used if notification creation fails)
+   * @param {object} info - Update info
+   */
   promptUserToDownload(info) {
     const dialogOpts = {
       type: 'info',
@@ -134,6 +270,10 @@ class UpdateManager {
     });
   }
 
+  /**
+   * Fallback method: Dialog prompt for install (used if notification creation fails)
+   * @param {object} info - Update info
+   */
   promptUserToInstall(info) {
     const dialogOpts = {
       type: 'info',

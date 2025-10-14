@@ -1,0 +1,227 @@
+/* Notification Styles */
+
+/* Notification Card */
+.notification-card {
+  cursor: pointer;
+  transition: all 0.2s ease-in-out;
+}
+
+.notification-card:hover {
+  background-color: rgba(0, 0, 0, 0.02);
+}
+
+.dark .notification-card:hover {
+  background-color: rgba(255, 255, 255, 0.02);
+}
+
+/* Unread Notification */
+.notification-card-unread {
+  position: relative;
+}
+
+.notification-card-unread::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  background: linear-gradient(to bottom, #3b82f6, #2563eb);
+}
+
+/* Badge Styles */
+.notification-badge {
+  position: absolute;
+  top: 0;
+  right: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 4px;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1;
+  color: white;
+  background-color: #ef4444;
+  border-radius: 9px;
+  border: 2px solid white;
+}
+
+.dark .notification-badge {
+  border-color: #111827;
+}
+
+/* Red Dot Badge */
+.notification-badge-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background-color: #ef4444;
+  border: 2px solid white;
+  position: absolute;
+  top: 2px;
+  right: 2px;
+}
+
+.dark .notification-badge-dot {
+  border-color: #111827;
+}
+
+/* Expand/Collapse Animation */
+.notification-card {
+  max-height: 150px;
+  overflow: hidden;
+  transition: max-height 0.3s ease-in-out;
+}
+
+.notification-card-expanded {
+  max-height: 1000px;
+}
+
+/* Action Buttons */
+.notification-action-btn {
+  padding: 8px 16px;
+  font-size: 14px;
+  font-weight: 500;
+  border-radius: 8px;
+  transition: all 0.2s ease-in-out;
+  cursor: pointer;
+}
+
+.notification-action-btn-primary {
+  background-color: #2563eb;
+  color: white;
+}
+
+.notification-action-btn-primary:hover {
+  background-color: #1d4ed8;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+}
+
+.notification-action-btn-secondary {
+  background-color: #e5e7eb;
+  color: #374151;
+}
+
+.dark .notification-action-btn-secondary {
+  background-color: #374151;
+  color: #e5e7eb;
+}
+
+.notification-action-btn-secondary:hover {
+  background-color: #d1d5db;
+}
+
+.dark .notification-action-btn-secondary:hover {
+  background-color: #4b5563;
+}
+
+/* Modal Overlay */
+.notification-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  z-index: 50;
+  animation: fadeIn 0.2s ease-in-out;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* Modal Container */
+.notification-modal {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  z-index: 50;
+  pointer-events: none;
+  padding: 80px 16px 16px;
+}
+
+.notification-modal-content {
+  pointer-events: auto;
+  width: 100%;
+  max-width: 672px;
+  background-color: white;
+  border-radius: 12px;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+  max-height: 70vh;
+  display: flex;
+  flex-direction: column;
+  animation: slideDown 0.3s ease-out;
+}
+
+.dark .notification-modal-content {
+  background-color: #111827;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.3), 0 10px 10px -5px rgba(0, 0, 0, 0.2);
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Scrollbar Styling */
+.notification-modal-content::-webkit-scrollbar {
+  width: 8px;
+}
+
+.notification-modal-content::-webkit-scrollbar-track {
+  background: #f1f5f9;
+}
+
+.dark .notification-modal-content::-webkit-scrollbar-track {
+  background: #1e293b;
+}
+
+.notification-modal-content::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 4px;
+}
+
+.dark .notification-modal-content::-webkit-scrollbar-thumb {
+  background: #475569;
+}
+
+.notification-modal-content::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+.dark .notification-modal-content::-webkit-scrollbar-thumb:hover {
+  background: #64748b;
+}
+
+/* Empty State */
+.notification-empty-state {
+  padding: 48px 16px;
+  text-align: center;
+}
+
+/* Responsive */
+@media (max-width: 640px) {
+  .notification-modal {
+    padding: 60px 8px 8px;
+  }
+
+  .notification-modal-content {
+    max-height: 80vh;
+  }
+}
+

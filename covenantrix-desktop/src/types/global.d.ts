@@ -99,6 +99,35 @@ declare global {
       startGoogleOAuth: () => Promise<void>;
       onOAuthCallback: (callback: (data: { code: string; state: string }) => void) => void;
       
+      // Notifications
+      notifications: {
+        getAll: () => Promise<any>;
+        getUnreadCount: () => Promise<any>;
+        markAsRead: (id: string) => Promise<any>;
+        dismiss: (id: string) => Promise<any>;
+        cleanup: () => Promise<any>;
+      };
+      
+      // Update actions
+      update: {
+        download: () => Promise<{ success: boolean; error?: string }>;
+        install: () => Promise<{ success: boolean; error?: string }>;
+      };
+      
+      // Update notification event listeners
+      onUpdateNotificationCreated: (callback: () => void) => () => void;
+      onUpdateReadyNotificationCreated: (callback: () => void) => () => void;
+      
+      // Update status event listener (for download progress)
+      onUpdateStatus: (callback: (data: {
+        status: string;
+        data?: {
+          percent?: number;
+          transferred?: number;
+          total?: number;
+        };
+      }) => void) => () => void;
+      
       // Event listeners
       onDocumentProcessed: (callback: (event: any, data: any) => void) => void;
       onSettingsChanged: (callback: (event: any, data: any) => void) => void;
