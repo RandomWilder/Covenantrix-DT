@@ -18,6 +18,11 @@ const { registerHandlers: registerFileHandlers } = require('./ipc-handlers')
 let mainWindow
 let secureStore
 
+// Export function to get mainWindow reference for IPC handlers
+function getMainWindow() {
+  return mainWindow
+}
+
 function initializeUserDataDirectory() {
   /**
    * Initialize user data directory for Covenantrix
@@ -229,7 +234,7 @@ app.whenReady().then(async () => {
   }
   
   // Register IPC handlers
-  registerFileHandlers()
+  registerFileHandlers(getMainWindow)
   registerUpdaterHandlers()
   
   // Create window (this will start backend too)

@@ -10,6 +10,9 @@ const { openOAuthWindow } = require('./oauth-handler')
  * Handles file selection, validation, and upload operations
  */
 
+// Store reference to main window getter function
+let getMainWindowRef = null
+
 // Only register handlers if ipcMain is available (in Electron context)
 if (ipcMain) {
   // File selection handlers
@@ -681,12 +684,22 @@ ipcMain.handle('get-zoom-level', async (event) => {
 // Google OAuth handlers
 ipcMain.handle('google-oauth-start', async (event) => {
   try {
-    // Get the main window from the event sender
-    const mainWindow = require('electron').BrowserWindow.fromWebContents(event.sender);
+    // Get main window from stored reference
+    const mainWindow = getMainWindowRef ? getMainWindowRef() : null;
+    
+    if (!mainWindow) {
+      throw new Error('Main window reference not available');
+    }
     
     // Call backend to get OAuth URL (use 127.0.0.1 to force IPv4)
     const response = await axios.post('http://127.0.0.1:8000/api/google/accounts/connect');
     const { auth_url } = response.data;
+    
+    if (!auth_url) {
+      throw new Error('No authorization URL returned from backend');
+    }
+    
+    console.log('Opening OAuth window with URL:', auth_url);
     
     // Open OAuth window
     await openOAuthWindow(auth_url, mainWindow);
@@ -703,8 +716,9 @@ ipcMain.handle('google-oauth-start', async (event) => {
 
 module.exports = {
   // Export handlers for registration in main.js
-  registerHandlers: () => {
-    // Handlers are already registered above
+  registerHandlers: (getMainWindow) => {
+    // Store reference to main window getter
+    getMainWindowRef = getMainWindow
     console.log('File operation, settings, and OAuth IPC handlers registered')
   }
 }

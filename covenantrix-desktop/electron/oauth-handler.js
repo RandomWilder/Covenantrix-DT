@@ -13,13 +13,21 @@ const { BrowserWindow } = require('electron');
  */
 function openOAuthWindow(authUrl, mainWindow) {
   return new Promise((resolve, reject) => {
-    // Create OAuth window
-    const authWindow = new BrowserWindow({
+    // Validate inputs
+    if (!authUrl) {
+      reject(new Error('OAuth URL is required'));
+      return;
+    }
+    
+    if (!mainWindow || mainWindow.isDestroyed()) {
+      console.warn('Main window not available, creating standalone OAuth window');
+    }
+    
+    // Create OAuth window configuration
+    const windowConfig = {
       width: 500,
       height: 600,
       show: false,
-      modal: true,
-      parent: mainWindow,
       webPreferences: {
         nodeIntegration: false,
         contextIsolation: true,
@@ -27,13 +35,29 @@ function openOAuthWindow(authUrl, mainWindow) {
       },
       title: 'Google Authentication',
       autoHideMenuBar: true
-    });
+    };
+    
+    // Add parent if mainWindow is valid
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      windowConfig.modal = true;
+      windowConfig.parent = mainWindow;
+    }
+    
+    // Create OAuth window
+    const authWindow = new BrowserWindow(windowConfig);
 
     // Load the OAuth URL
-    authWindow.loadURL(authUrl);
+    authWindow.loadURL(authUrl).catch(err => {
+      console.error('Failed to load OAuth URL:', err);
+      if (!authWindow.isDestroyed()) {
+        authWindow.close();
+      }
+      reject(new Error(`Failed to load OAuth page: ${err.message}`));
+    });
 
     // Show window when ready
     authWindow.once('ready-to-show', () => {
+      console.log('OAuth window ready, showing...');
       authWindow.show();
     });
 
@@ -94,11 +118,26 @@ function openOAuthWindow(authUrl, mainWindow) {
     // Handle errors
     authWindow.webContents.on('did-fail-load', (event, errorCode, errorDescription) => {
       if (!callbackHandled) {
+        console.error('OAuth window failed to load:', errorCode, errorDescription);
         reject(new Error(`Failed to load OAuth page: ${errorDescription}`));
         if (authWindow && !authWindow.isDestroyed()) {
           authWindow.close();
         }
       }
+    });
+    
+    // Add timeout protection (30 seconds)
+    const timeout = setTimeout(() => {
+      if (!callbackHandled && authWindow && !authWindow.isDestroyed()) {
+        console.error('OAuth flow timeout - no callback received');
+        authWindow.close();
+        reject(new Error('OAuth flow timed out'));
+      }
+    }, 30000);
+    
+    // Clear timeout when promise settles
+    authWindow.once('closed', () => {
+      clearTimeout(timeout);
     });
   });
 }
