@@ -183,6 +183,19 @@ jobs:
           
           echo "Backend test passed"
       
+      - name: Inject Production API Keys
+        shell: bash
+        run: |
+          echo "=== Injecting Production API Keys ==="
+          cat > backend/.env << 'EOF'
+          OPENAI_API_KEY=${{ secrets.PROD_OPENAI_API_KEY }}
+          COHERE_API_KEY=${{ secrets.PROD_COHERE_API_KEY }}
+          GOOGLE_API_KEY=${{ secrets.PROD_GOOGLE_API_KEY }}
+          GOOGLE_CLIENT_SECRET=${{ secrets.PROD_GOOGLE_CLIENT_SECRET }}
+          ENVIRONMENT=production
+          EOF
+          echo "Production .env file created successfully"
+      
       # === BUILD ELECTRON ===
       
       - name: Build Electron App
