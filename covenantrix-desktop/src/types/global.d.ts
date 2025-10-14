@@ -31,11 +31,14 @@ declare global {
       }>;
       validateApiKeys: (apiKeys: any) => Promise<{
         success: boolean;
-        openai_valid?: boolean | null;
-        cohere_valid?: boolean | null;
-        google_valid?: boolean | null;
-        message?: string;
-        errors?: Record<string, string>;
+        validation?: {
+          openai_valid?: boolean | null;
+          cohere_valid?: boolean | null;
+          google_valid?: boolean | null;
+          message?: string;
+          errors?: Record<string, string>;
+        };
+        error?: string;
       }>;
       applySettings: (settings: any) => Promise<{
         success: boolean;
@@ -112,6 +115,23 @@ declare global {
       update: {
         download: () => Promise<{ success: boolean; error?: string }>;
         install: () => Promise<{ success: boolean; error?: string }>;
+      };
+      
+      // Subscription management
+      subscription: {
+        getStatus: () => Promise<{
+          success: boolean;
+          data?: {
+            subscription: any;
+            usage: any;
+          };
+          error?: string;
+        }>;
+        activateLicense: (key: string) => Promise<{
+          success: boolean;
+          data?: any;
+          error?: string;
+        }>;
       };
       
       // Update notification event listeners

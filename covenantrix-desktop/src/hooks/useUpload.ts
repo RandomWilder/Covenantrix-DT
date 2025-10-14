@@ -1,5 +1,7 @@
 import { useState, useCallback, useEffect, useRef } from 'react'
 import { useToast } from './useToast'
+import { useSubscription } from '../contexts/SubscriptionContext'
+import { useUpgradeModal } from '../contexts/UpgradeModalContext'
 import { DocumentsApi } from '../services/api/DocumentsApi'
 import { DocumentProgressStage } from '../types/document'
 
@@ -60,6 +62,8 @@ export const useUpload = () => {
     files: []
   })
   const { showToast } = useToast()
+  const { subscription, canUploadDocument, getRemainingQuota } = useSubscription()
+  const { showUpgradeModal } = useUpgradeModal()
   const pollingIntervalRef = useRef<NodeJS.Timeout>()
   
   // Poll backend for document status updates
@@ -293,6 +297,34 @@ export const useUpload = () => {
   }, [files, isUploading, uploadProgress])
   
   const addFiles = useCallback((newFiles: File[]) => {
+    // Check subscription limits
+    if (!canUploadDocument()) {
+      const remaining = getRemainingQuota('documents')
+      showUpgradeModal({
+        title: 'Document Limit Reached',
+        message: `You've reached the maximum of ${subscription?.features.max_documents} documents for the ${subscription?.tier} tier.`,
+        currentTier: subscription?.tier,
+        details: `Remaining documents: ${remaining}`
+      })
+      return
+    }
+    
+    // Check file sizes
+    if (subscription) {
+      const maxSizeMB = subscription.features.max_doc_size_mb
+      const oversizedFiles = newFiles.filter(f => (f.size / (1024 * 1024)) > maxSizeMB)
+      
+      if (oversizedFiles.length > 0) {
+        showToast(
+          `${oversizedFiles.length} file(s) exceed the ${maxSizeMB}MB size limit for your ${subscription.tier} tier`,
+          'error'
+        )
+        // Filter out oversized files
+        newFiles = newFiles.filter(f => (f.size / (1024 * 1024)) <= maxSizeMB)
+        if (newFiles.length === 0) return
+      }
+    }
+    
     const fileItems: FileItem[] = newFiles.map(file => ({
       id: Math.random().toString(36).substr(2, 9),
       file,
@@ -303,7 +335,7 @@ export const useUpload = () => {
     
     setFiles(prev => [...prev, ...fileItems])
     showToast(`${newFiles.length} file(s) added`, 'success')
-  }, [showToast])
+  }, [showToast, canUploadDocument, getRemainingQuota, subscription, showUpgradeModal])
 
   const addDriveFiles = useCallback((driveFiles: Array<{id: string; name: string; size?: number}>, accountId: string, accountEmail: string) => {
     const fileItems: FileItem[] = driveFiles.map(driveFile => ({
@@ -354,6 +386,18 @@ export const useUpload = () => {
   const startUpload = useCallback(async () => {
     if (files.length === 0) {
       showToast('No files selected', 'error')
+      return
+    }
+    
+    // Double-check subscription limits before upload
+    if (!canUploadDocument()) {
+      const remaining = getRemainingQuota('documents')
+      showUpgradeModal({
+        title: 'Upload Limit Reached',
+        message: `Cannot upload documents. You've reached your limit for the ${subscription?.tier} tier.`,
+        currentTier: subscription?.tier,
+        details: `Remaining documents: ${remaining}`
+      })
       return
     }
 
@@ -412,7 +456,7 @@ export const useUpload = () => {
     } finally {
       setIsUploading(false)
     }
-  }, [files, showToast, updateFileStatus, startPollingBackend])
+  }, [files, showToast, updateFileStatus, startPollingBackend, canUploadDocument, getRemainingQuota, subscription, showUpgradeModal])
 
   return {
     files,

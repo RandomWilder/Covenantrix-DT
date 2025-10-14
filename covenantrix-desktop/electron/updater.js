@@ -141,8 +141,8 @@ class UpdateManager {
       ? this.formatBytes(info.files[0].size) 
       : 'Unknown';
 
-    // Format structure
-    const formatted = `**Current Version:** ${app.getVersion()}\n**New Version:** ${info.version}\n\n**Release Notes:**\n${notes}\n\n**Download Size:** ${downloadSize}`;
+    // Format structure (no markdown to display as plain text)
+    const formatted = `Current Version: ${app.getVersion()}\nNew Version: ${info.version}\n\nRelease Notes:\n${notes}\n\nDownload Size: ${downloadSize}`;
     
     return formatted;
   }

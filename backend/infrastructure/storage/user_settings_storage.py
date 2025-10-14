@@ -189,6 +189,22 @@ class UserSettingsStorage:
                 data["google_accounts"] = []
                 needs_save = True
             
+            # Add subscription section if missing
+            if "subscription" not in data:
+                logger.info("Adding subscription section to settings")
+                from domain.subscription.tier_config import get_tier_features
+                data["subscription"] = {
+                    "tier": "trial",
+                    "license_key": None,
+                    "trial_started_at": None,
+                    "trial_expires_at": None,
+                    "grace_period_started_at": None,
+                    "grace_period_expires_at": None,
+                    "features": get_tier_features("trial"),
+                    "last_tier_change": None
+                }
+                needs_save = True
+            
             return data, needs_save
             
         except Exception as e:

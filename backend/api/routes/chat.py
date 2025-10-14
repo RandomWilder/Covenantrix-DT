@@ -46,6 +46,24 @@ async def send_message(
             detail="No valid OpenAI API key configured. Please configure your API key in Settings to start chatting."
         )
     
+    # NEW: Check query limits
+    from core.dependencies import get_subscription_service
+    subscription_service = get_subscription_service()
+    
+    can_query, reason = await subscription_service.check_query_allowed()
+    if not can_query:
+        remaining = await subscription_service.get_remaining_queries()
+        raise HTTPException(
+            status_code=429,  # Too Many Requests
+            detail={
+                "error": "query_limit_reached",
+                "message": reason,
+                "remaining_monthly": remaining["monthly_remaining"],
+                "remaining_daily": remaining["daily_remaining"],
+                "reset_dates": remaining["reset_dates"]
+            }
+        )
+    
     try:
         response = await service.send_message(
             message=request.message,
@@ -64,6 +82,9 @@ async def send_message(
                 "confidence": source.confidence,
                 "excerpt": source.excerpt
             })
+        
+        # NEW: Record query usage
+        await subscription_service.record_query()
         
         return ChatMessageResponse(
             success=True,
@@ -107,6 +128,24 @@ async def send_message_stream(
             detail="No valid OpenAI API key configured. Please configure your API key in Settings to start chatting."
         )
     
+    # NEW: Check query limits
+    from core.dependencies import get_subscription_service
+    subscription_service = get_subscription_service()
+    
+    can_query, reason = await subscription_service.check_query_allowed()
+    if not can_query:
+        remaining = await subscription_service.get_remaining_queries()
+        raise HTTPException(
+            status_code=429,  # Too Many Requests
+            detail={
+                "error": "query_limit_reached",
+                "message": reason,
+                "remaining_monthly": remaining["monthly_remaining"],
+                "remaining_daily": remaining["daily_remaining"],
+                "reset_dates": remaining["reset_dates"]
+            }
+        )
+    
     async def generate_stream():
         """Generate SSE stream"""
         try:
@@ -119,6 +158,9 @@ async def send_message_stream(
                 # Format as Server-Sent Event
                 data = json.dumps(chunk)
                 yield f"data: {data}\n\n"
+            
+            # NEW: Record query usage after streaming completes
+            await subscription_service.record_query()
                 
         except MessageProcessingError as e:
             logger.error(f"Streaming message processing failed: {e}")

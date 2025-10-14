@@ -5,6 +5,7 @@ pydantic>=2.5.0
 pydantic-settings>=2.1.0
 python-dotenv>=1.0.0
 cryptography>=41.0.0
+PyJWT>=2.8.0
 python-multipart
 aiofiles
 aiohttp>=3.8.0

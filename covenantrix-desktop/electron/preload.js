@@ -58,6 +58,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
     install: () => ipcRenderer.invoke('update:install')
   },
   
+  // Subscription management
+  subscription: {
+    getStatus: () => ipcRenderer.invoke('subscription:getStatus'),
+    activateLicense: (key) => ipcRenderer.invoke('subscription:activateLicense', key)
+  },
+  
   // Update notification event listeners
   onUpdateNotificationCreated: (callback) => {
     const handler = () => callback();

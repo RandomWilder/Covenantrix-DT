@@ -127,6 +127,11 @@ export function NotificationCard({
                     key={index}
                     onClick={(e) => {
                       e.stopPropagation();
+                      console.log('[NotificationCard] Action button clicked', { 
+                        notificationId: notification.id, 
+                        action: action.action,
+                        actionLabel: action.label 
+                      });
                       onAction(notification.id, action.action);
                     }}
                     className="px-4 py-2 text-sm font-medium rounded-lg transition-colors

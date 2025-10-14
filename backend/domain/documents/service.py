@@ -355,16 +355,18 @@ class DocumentService:
     
     async def list_documents(
         self,
-        include_deleted: bool = False
+        include_deleted: bool = False,
+        subscription_tier: Optional[str] = None
     ) -> List[Document]:
         """
-        List all documents from registry
+        List all documents from registry with tier-based visibility
         
         Args:
             include_deleted: Include soft-deleted documents
+            subscription_tier: User's subscription tier for filtering
             
         Returns:
-            List of documents
+            List of documents (filtered by tier limits if applicable)
         """
         docs_data = await self.registry.list_documents(
             status=None,
@@ -401,6 +403,21 @@ class DocumentService:
                 updated_at=datetime.fromisoformat(doc_data["updated_at"]),
                 processing_result=processing_result
             ))
+        
+        # NEW: Apply tier-based visibility filtering
+        if subscription_tier:
+            from domain.subscription.tier_config import TIER_LIMITS
+            
+            if subscription_tier == "paid_limited":
+                # Show only first 3 documents by upload date (oldest first)
+                documents = sorted(documents, key=lambda d: d.created_at)[:3]
+            else:
+                # Apply max_documents limit if not unlimited
+                tier_config = TIER_LIMITS.get(subscription_tier)
+                if tier_config:
+                    max_docs = tier_config["max_documents"]
+                    if max_docs != -1:
+                        documents = sorted(documents, key=lambda d: d.created_at)[:max_docs]
         
         return documents
     

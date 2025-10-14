@@ -13,7 +13,7 @@ const { updateManager, checkForUpdates, manualUpdateCheck } = require('./updater
 const { backendManager, startBackend, stopBackend, getBackendStatus } = require('./backend-manager')
 
 // Import IPC handlers
-const { registerHandlers: registerFileHandlers, registerNotificationHandlers, registerUpdateHandlers } = require('./ipc-handlers')
+const { registerHandlers: registerFileHandlers, registerNotificationHandlers, registerUpdateHandlers, registerSubscriptionHandlers } = require('./ipc-handlers')
 
 let mainWindow
 let secureStore
@@ -237,6 +237,7 @@ app.whenReady().then(async () => {
   registerFileHandlers(getMainWindow)
   registerNotificationHandlers()
   registerUpdateHandlers()
+  registerSubscriptionHandlers()
   registerUpdaterHandlers()
   
   // Create window (this will start backend too)

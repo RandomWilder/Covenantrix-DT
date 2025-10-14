@@ -43,6 +43,7 @@ _ocr_service: Optional[OCRService] = None
 _user_settings_storage: Optional[UserSettingsStorage] = None
 _oauth_service: Optional[GoogleOAuthService] = None
 _notification_storage: Optional[NotificationStorage] = None
+_subscription_service: Optional['SubscriptionService'] = None
 
 
 def set_rag_engine(rag_engine: Optional[RAGEngine]) -> None:
@@ -418,3 +419,37 @@ async def get_optional_api_key(
 ) -> Optional[str]:
     """Get API key if configured, None otherwise"""
     return settings.openai.api_key
+
+
+# Subscription service management
+def set_subscription_service(service: 'SubscriptionService') -> None:
+    """
+    Set global subscription service instance (called from main.py during startup)
+    
+    Args:
+        service: Initialized subscription service instance
+    """
+    global _subscription_service
+    _subscription_service = service
+    logger.debug("Subscription service registered globally")
+
+
+def get_subscription_service() -> 'SubscriptionService':
+    """
+    Get subscription service instance (dependency injection)
+    
+    Returns:
+        Subscription service instance
+        
+    Raises:
+        HTTPException: If subscription service not initialized
+    """
+    global _subscription_service
+    
+    if _subscription_service is None:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Subscription service not initialized"
+        )
+    
+    return _subscription_service

@@ -84,28 +84,42 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
     try {
       switch (action) {
         case 'download_update':
-          // Trigger update download via IPC
-          await window.electronAPI.update.download();
+          console.log('[NotificationContext] Download update triggered', { notificationId });
           
-          // Keep notification open and mark as downloading
-          setNotifications(prev => 
-            prev.map(n => n.id === notificationId ? {
-              ...n,
-              downloadProgress: {
-                percent: 0,
-                transferred: 0,
-                total: 0,
-                isDownloading: true
-              }
-            } : n)
-          );
-          
-          // Keep notification expanded to show progress
-          setExpandedNotifications(prev => {
-            const newSet = new Set(prev);
-            newSet.add(notificationId);
-            return newSet;
-          });
+          try {
+            // Trigger update download via IPC
+            const result = await window.electronAPI.update.download();
+            console.log('[NotificationContext] Download initiated', result);
+            
+            if (!result.success) {
+              console.error('[NotificationContext] Download failed:', result.error);
+              // TODO: Show error to user
+              return;
+            }
+            
+            // Keep notification open and mark as downloading
+            setNotifications(prev => 
+              prev.map(n => n.id === notificationId ? {
+                ...n,
+                downloadProgress: {
+                  percent: 0,
+                  transferred: 0,
+                  total: 0,
+                  isDownloading: true
+                }
+              } : n)
+            );
+            
+            // Keep notification expanded to show progress
+            setExpandedNotifications(prev => {
+              const newSet = new Set(prev);
+              newSet.add(notificationId);
+              return newSet;
+            });
+          } catch (error) {
+            console.error('[NotificationContext] Download exception:', error);
+            // TODO: Show error to user
+          }
           break;
 
         case 'install_update':

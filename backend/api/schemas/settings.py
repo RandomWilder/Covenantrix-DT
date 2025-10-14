@@ -118,6 +118,28 @@ class PrivacySettings(BaseModel):
     retain_history: bool = Field(default=True, description="Retain chat history")
 
 
+class FeatureFlags(BaseModel):
+    """Tier-based feature limits"""
+    max_documents: int = Field(default=3, description="Max documents (-1 = unlimited)")
+    max_doc_size_mb: int = Field(default=10, description="Max per-document size")
+    max_total_storage_mb: int = Field(default=30, description="Max total storage")
+    max_queries_monthly: int = Field(default=-1, description="Monthly query limit (-1 = unlimited)")
+    max_queries_daily: int = Field(default=-1, description="Daily query limit (-1 = unlimited)")
+    use_default_keys: bool = Field(default=False, description="Allow default API keys")
+
+
+class SubscriptionSettings(BaseModel):
+    """User subscription state - system-managed"""
+    tier: str = Field(default="trial", description="trial|free|paid|paid_limited")
+    license_key: Optional[str] = Field(default=None, description="JWT license token")
+    trial_started_at: Optional[str] = Field(default=None, description="ISO datetime of first launch")
+    trial_expires_at: Optional[str] = Field(default=None, description="ISO datetime when trial ends")
+    grace_period_started_at: Optional[str] = Field(default=None, description="When grace period began")
+    grace_period_expires_at: Optional[str] = Field(default=None, description="When grace period ends")
+    features: FeatureFlags = Field(default_factory=FeatureFlags)
+    last_tier_change: Optional[str] = Field(default=None, description="ISO datetime of last tier change")
+
+
 class ProfileSettings(BaseModel):
     """User profile information"""
     first_name: Optional[str] = None
@@ -150,6 +172,7 @@ class UserSettings(BaseModel):
     privacy: PrivacySettings = Field(default_factory=PrivacySettings, description="Privacy settings")
     profile: ProfileSettings = Field(default_factory=ProfileSettings, description="User profile information")
     google_accounts: List[GoogleAccountSettings] = Field(default_factory=list, description="Connected Google accounts")
+    subscription: SubscriptionSettings = Field(default_factory=SubscriptionSettings, description="Subscription tier and limits")
     version: str = Field(default="1.0", description="Settings schema version")
     last_updated: Optional[str] = Field(default=None, description="Last update timestamp")
 

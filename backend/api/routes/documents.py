@@ -17,7 +17,7 @@ from domain.documents.service import DocumentService
 from domain.documents.models import Document
 from infrastructure.ai.document_processor import DocumentProcessor
 from infrastructure.storage.file_storage import FileStorage
-from core.dependencies import get_document_service, get_ocr_service
+from core.dependencies import get_document_service, get_ocr_service, get_subscription_service
 from api.schemas.documents import (
     DocumentResponse, DocumentListResponse, DocumentUploadResponse,
     BatchUploadResponse, BatchUploadItem, GoogleDriveFileRequest,
@@ -54,6 +54,23 @@ async def upload_document(
             detail="No valid OpenAI API key configured. Please configure your API key in Settings to upload documents."
         )
     
+    # NEW: Check subscription limits
+    from core.dependencies import get_subscription_service
+    subscription_service = get_subscription_service()
+    
+    can_upload, reason = await subscription_service.check_upload_allowed()
+    if not can_upload:
+        current_subscription = await subscription_service.get_current_subscription_async()
+        raise HTTPException(
+            status_code=402,  # Payment Required
+            detail={
+                "error": "upload_limit_reached",
+                "message": reason,
+                "current_tier": current_subscription.tier,
+                "upgrade_required": True
+            }
+        )
+    
     try:
         # Validate file
         if not file.filename:
@@ -62,6 +79,22 @@ async def upload_document(
         # Read file content
         content = await file.read()
         await file.seek(0)  # Reset for potential re-reading
+        
+        # NEW: Check file size against tier limit
+        file_size_mb = len(content) / (1024 * 1024)
+        tier_limits = subscription_service.get_current_limits()
+        current_subscription = await subscription_service.get_current_subscription_async()
+        
+        if file_size_mb > tier_limits["max_doc_size_mb"]:
+            raise HTTPException(
+                status_code=413,  # Payload Too Large
+                detail={
+                    "error": "file_too_large",
+                    "file_size_mb": round(file_size_mb, 2),
+                    "max_size_mb": tier_limits["max_doc_size_mb"],
+                    "current_tier": current_subscription.tier
+                }
+            )
         
         # Create document
         document = await service.upload_document(
@@ -92,6 +125,9 @@ async def upload_document(
             extracted_content=extracted_text,
             processing_time=time.time() - start_time
         )
+        
+        # NEW: Record document upload for usage tracking
+        await subscription_service.record_document_upload(document.id, file_size_mb)
         
         logger.info(f"Document uploaded and processed: {document.id}")
         
@@ -133,6 +169,12 @@ async def upload_documents_stream(
             detail="No valid OpenAI API key configured. Please configure your API key in Settings to upload documents."
         )
     
+    # NEW: Get subscription service for limit checks
+    from core.dependencies import get_subscription_service
+    subscription_service = get_subscription_service()
+    tier_limits = subscription_service.get_current_limits()
+    current_subscription = await subscription_service.get_current_subscription_async()
+    
     # CRITICAL: Read all file contents BEFORE creating the generator
     # FastAPI closes UploadFile objects when the route function returns,
     # so we must read them before returning StreamingResponse
@@ -154,19 +196,58 @@ async def upload_documents_stream(
     # Read all file contents into memory before streaming
     file_contents = []
     filenames = []
+    file_sizes_mb = []
     for file_index, file in enumerate(files):
         filename = file.filename or f"file_{file_index}"
         content = await file.read()
+        file_size_mb = len(content) / (1024 * 1024)
+        
+        # NEW: Check file size against tier limit
+        if file_size_mb > tier_limits["max_doc_size_mb"]:
+            raise HTTPException(
+                status_code=413,  # Payload Too Large
+                detail={
+                    "error": "file_too_large",
+                    "filename": filename,
+                    "file_size_mb": round(file_size_mb, 2),
+                    "max_size_mb": tier_limits["max_doc_size_mb"],
+                    "current_tier": current_subscription.tier
+                }
+            )
+        
         file_contents.append(content)
         filenames.append(filename)
+        file_sizes_mb.append(file_size_mb)
     
     async def generate_progress_stream():
         """Generate SSE stream with progress updates"""
         try:
             total_files = len(file_contents)
             
-            for file_index, (content, filename) in enumerate(zip(file_contents, filenames)):
+            for file_index, (content, filename, file_size_mb) in enumerate(zip(file_contents, filenames, file_sizes_mb)):
                 try:
+                    # NEW: Check if upload is allowed for this document
+                    can_upload, reason = await subscription_service.check_upload_allowed()
+                    if not can_upload:
+                        # Emit failure event
+                        progress_event = DocumentProgressEvent(
+                            filename=filename,
+                            document_id=None,
+                            stage=DocumentProgressStage.FAILED,
+                            message=reason,
+                            progress_percent=0,
+                            timestamp=datetime.utcnow().isoformat(),
+                            error=reason
+                        )
+                        batch_event = BatchProgressEvent(
+                            total_files=total_files,
+                            current_file_index=file_index,
+                            file_progress=progress_event,
+                            overall_progress_percent=int(((file_index + 1) / total_files) * 100)
+                        )
+                        yield f"data: {batch_event.model_dump_json()}\n\n"
+                        continue
+                    
                     # Stage 1: Initializing (10%)
                     progress_event = DocumentProgressEvent(
                         filename=filename,
@@ -263,6 +344,9 @@ async def upload_documents_stream(
                     # Wait for task completion and check for exceptions
                     await process_task
                     
+                    # NEW: Record document upload for usage tracking
+                    await subscription_service.record_document_upload(document.id, file_size_mb)
+                    
                     # Drain remaining events from queue
                     while not progress_queue.empty():
                         try:
@@ -339,7 +423,16 @@ async def list_documents(
         List of documents
     """
     try:
-        documents = await service.list_documents(include_deleted)
+        # NEW: Apply tier-based visibility filtering
+        from core.dependencies import get_subscription_service
+        subscription_service = get_subscription_service()
+        current_subscription = await subscription_service.get_current_subscription_async()
+        current_tier = current_subscription.tier
+        
+        documents = await service.list_documents(
+            include_deleted=include_deleted,
+            subscription_tier=current_tier
+        )
         
         return DocumentListResponse(
             success=True,

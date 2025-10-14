@@ -7,6 +7,8 @@ import DocumentsScreen from '../../features/documents/DocumentsScreen'
 import { ChatScreen } from '../../features/chat/ChatScreen'
 import { ChatProvider } from '../../contexts/ChatContext'
 import ProfileModal from '../../features/profile/ProfileModal'
+import { TrialBanner } from '../../features/subscription/TrialBanner'
+import { GracePeriodWarning } from '../../features/subscription/GracePeriodWarning'
 
 interface AppLayoutProps {
   children?: React.ReactNode
@@ -48,6 +50,8 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
   return (
     <div className="app-window flex flex-col">
       <Header onProfileClick={() => setIsProfileModalOpen(true)} />
+      <GracePeriodWarning />
+      <TrialBanner />
       <div className="flex flex-1 overflow-hidden">
         <Sidebar onNavigate={setActiveScreen} activeScreen={activeScreen} />
         <main className="main-content flex-1 flex flex-col">

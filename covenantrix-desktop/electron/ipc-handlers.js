@@ -426,7 +426,7 @@ ipcMain.handle('update-settings', async (event, settingsData) => {
     
     // Forward to backend API first to validate
     try {
-      const backendUrl = 'http://127.0.0.1:8000/settings'
+      const backendUrl = 'http://127.0.0.1:8000/api/settings'
       const response = await axios.post(backendUrl, {
         settings: settingsData
       })
@@ -486,7 +486,7 @@ ipcMain.handle('update-settings', async (event, settingsData) => {
 
 ipcMain.handle('validate-api-keys', async (event, apiKeys) => {
   try {
-    const backendUrl = 'http://127.0.0.1:8000/settings/api-keys/validate'
+    const backendUrl = 'http://127.0.0.1:8000/api/settings/api-keys/validate'
     const response = await axios.post(backendUrl, apiKeys)
     
     return {
@@ -505,7 +505,7 @@ ipcMain.handle('validate-api-keys', async (event, apiKeys) => {
 
 ipcMain.handle('apply-settings', async (event, settingsData) => {
   try {
-    const backendUrl = 'http://127.0.0.1:8000/settings/apply'
+    const backendUrl = 'http://127.0.0.1:8000/api/settings/apply'
     const response = await axios.post(backendUrl, {
       settings: settingsData
     })
@@ -526,7 +526,7 @@ ipcMain.handle('apply-settings', async (event, settingsData) => {
 
 ipcMain.handle('get-default-settings', async (event) => {
   try {
-    const backendUrl = 'http://127.0.0.1:8000/settings/defaults'
+    const backendUrl = 'http://127.0.0.1:8000/api/settings/defaults'
     const response = await axios.get(backendUrl)
     
     return {
@@ -545,7 +545,7 @@ ipcMain.handle('get-default-settings', async (event) => {
 
 ipcMain.handle('get-key-status', async (event) => {
   try {
-    const backendUrl = 'http://127.0.0.1:8000/settings/key-status'
+    const backendUrl = 'http://127.0.0.1:8000/api/settings/key-status'
     const response = await axios.get(backendUrl)
     
     return {
@@ -595,7 +595,7 @@ ipcMain.handle('services:status', async (event) => {
 
 ipcMain.handle('reset-settings', async (event) => {
   try {
-    const backendUrl = 'http://127.0.0.1:8000/settings/reset'
+    const backendUrl = 'http://127.0.0.1:8000/api/settings/reset'
     await axios.post(backendUrl)
     
     // Clear local storage
@@ -776,15 +776,30 @@ function registerNotificationHandlers() {
   console.log('Notification IPC handlers registered');
 }
 
+// Track download state
+let downloadInProgress = false;
+
 // Update action handlers
 function registerUpdateHandlers() {
   ipcMain.handle('update:download', async () => {
     try {
+      console.log('[IPC] Update download requested');
+      
+      if (downloadInProgress) {
+        console.warn('[IPC] Download already in progress');
+        return { success: false, error: 'Download already in progress' };
+      }
+      
+      downloadInProgress = true;
+      
       // Trigger download update
       await autoUpdater.downloadUpdate();
+      
+      console.log('[IPC] Download started successfully');
       return { success: true };
     } catch (error) {
-      console.error('Failed to download update:', error);
+      downloadInProgress = false;
+      console.error('[IPC] Failed to download update:', error);
       return { success: false, error: error.message };
     }
   });
@@ -808,6 +823,55 @@ function registerUpdateHandlers() {
   console.log('Update action IPC handlers registered');
 }
 
+/**
+ * Register subscription IPC handlers
+ */
+function registerSubscriptionHandlers() {
+  // Get subscription status
+  ipcMain.handle('subscription:getStatus', async () => {
+    try {
+      const backendUrl = global.backendUrl || 'http://localhost:8000';
+      const response = await axios.get(`${backendUrl}/api/subscription/status`);
+      
+      // Transform flat response to nested structure expected by frontend
+      const { usage, ...subscriptionFields } = response.data;
+      
+      return { 
+        success: true, 
+        data: {
+          subscription: subscriptionFields,
+          usage: usage
+        }
+      };
+    } catch (error) {
+      console.error('Error getting subscription status:', error.message);
+      return { 
+        success: false, 
+        error: error.response?.data?.detail || error.message 
+      };
+    }
+  });
+
+  // Activate license key
+  ipcMain.handle('subscription:activateLicense', async (event, licenseKey) => {
+    try {
+      const backendUrl = global.backendUrl || 'http://localhost:8000';
+      const response = await axios.post(`${backendUrl}/api/subscription/activate`, {
+        license_key: licenseKey
+      });
+      return { success: true, data: response.data };
+    } catch (error) {
+      console.error('Error activating license:', error.message);
+      return { 
+        success: false, 
+        error: error.response?.data?.detail?.message || error.message 
+      };
+    }
+  });
+
+  console.log('Subscription IPC handlers registered');
+}
+
 module.exports = {
   // Export handlers for registration in main.js
   registerHandlers: (getMainWindow) => {
@@ -816,5 +880,6 @@ module.exports = {
     console.log('File operation, settings, and OAuth IPC handlers registered')
   },
   registerNotificationHandlers,
-  registerUpdateHandlers
+  registerUpdateHandlers,
+  registerSubscriptionHandlers
 }

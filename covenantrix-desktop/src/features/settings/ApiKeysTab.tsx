@@ -53,14 +53,24 @@ const ApiKeysTab: React.FC<ApiKeysTabProps> = ({ settings, onChange, error, onCl
       
       const response = await window.electronAPI.validateApiKeys(validationRequest);
       
+      // Handle the response structure (validation data is nested under response.validation)
+      // IPC handler wraps the backend response in { success, validation, error }
+      if (!response.success || !response.validation) {
+        setValidationStatus(prev => ({ ...prev, [keyName]: 'invalid' }));
+        console.error(`${keyName} validation failed:`, response.error);
+        return;
+      }
+      
+      const validationData = response.validation;
+      
       // Check the specific key validation result
       let isValid = false;
       if (keyName === 'openai') {
-        isValid = response.openai_valid === true;
+        isValid = validationData.openai_valid === true;
       } else if (keyName === 'cohere') {
-        isValid = response.cohere_valid === true;
+        isValid = validationData.cohere_valid === true;
       } else if (keyName === 'google') {
-        isValid = response.google_valid === true;
+        isValid = validationData.google_valid === true;
       }
       
       setValidationStatus(prev => ({ 
@@ -68,8 +78,8 @@ const ApiKeysTab: React.FC<ApiKeysTabProps> = ({ settings, onChange, error, onCl
         [keyName]: isValid ? 'valid' : 'invalid' 
       }));
       
-      if (!isValid && response.errors && response.errors[keyName]) {
-        console.error(`${keyName} validation error:`, response.errors[keyName]);
+      if (!isValid && validationData.errors && validationData.errors[keyName]) {
+        console.error(`${keyName} validation error:`, validationData.errors[keyName]);
       }
     } catch (error) {
       console.error(`Error validating ${keyName} key:`, error);

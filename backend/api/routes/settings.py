@@ -16,7 +16,7 @@ from core.security import APIKeyManager
 from core.config import get_settings, Settings
 from core.api_key_resolver import get_api_key_resolver
 
-router = APIRouter(prefix="/settings", tags=["settings"])
+router = APIRouter(prefix="/api/settings", tags=["settings"])
 logger = logging.getLogger(__name__)
 
 # Initialize services
@@ -64,7 +64,7 @@ async def _validate_openai_key(api_key: str) -> tuple[bool, Optional[str]]:
 
 async def _validate_cohere_key(api_key: str) -> tuple[bool, Optional[str]]:
     """
-    Validate Cohere API key
+    Validate Cohere API key using official check-api-key endpoint
     
     Args:
         api_key: Cohere API key to validate
@@ -77,19 +77,38 @@ async def _validate_cohere_key(api_key: str) -> tuple[bool, Optional[str]]:
         if len(api_key) < 20:
             return False, "Invalid Cohere API key format. Please check your key and try again."
         
-        # Perform actual API validation
+        # Perform actual API validation using official Cohere endpoint
         try:
-            import cohere
-            client = cohere.AsyncClient(api_key=api_key)
-            # Make a minimal API call to verify the key
-            await client.check_api_key()
-            logger.info("API key validation: type=cohere, result=valid")
-            return True, None
+            import httpx
+            
+            url = "https://api.cohere.ai/v1/check-api-key"
+            headers = {
+                "Authorization": f"Bearer {api_key}",
+                "Content-Type": "application/json"
+            }
+            
+            async with httpx.AsyncClient(timeout=10.0) as client:
+                response = await client.post(url, headers=headers)
+                
+                if response.status_code == 200:
+                    result = response.json()
+                    is_valid = result.get("valid", False)
+                    
+                    if is_valid:
+                        logger.info("API key validation: type=cohere, result=valid")
+                        return True, None
+                    else:
+                        return False, "Invalid Cohere API key. Please check your key and try again."
+                else:
+                    logger.warning(f"Cohere validation failed with status {response.status_code}")
+                    return False, "Invalid Cohere API key. Please check your key and try again."
+                    
         except ImportError:
-            # Cohere SDK not installed - skip actual validation
-            logger.warning("Cohere SDK not available - format validation only")
+            # httpx not installed - skip actual validation
+            logger.warning("httpx not available - format validation only")
             return True, None
         except Exception as api_error:
+            logger.error(f"Cohere API validation error: {api_error}")
             return False, f"Invalid Cohere API key. Please check your key and try again."
     except Exception as e:
         return False, f"Cohere validation error: {str(e)}"
@@ -188,6 +207,23 @@ async def update_settings(request: SettingsUpdateRequest):
                     detail={
                         "message": "Invalid API keys provided",
                         "errors": validation_errors
+                    }
+                )
+        
+        # NEW: Validate API key mode against subscription tier
+        if request.settings.api_keys and request.settings.api_keys.mode == "default":
+            from core.dependencies import get_subscription_service
+            subscription_service = get_subscription_service()
+            current_subscription = await subscription_service.get_current_subscription_async()
+            
+            if not current_subscription.features.use_default_keys:
+                raise HTTPException(
+                    status_code=403,
+                    detail={
+                        "error": "default_keys_not_allowed",
+                        "message": f"Your {current_subscription.tier} tier requires custom API keys",
+                        "current_tier": current_subscription.tier,
+                        "allowed_mode": "custom"
                     }
                 )
         

@@ -48,14 +48,14 @@ from core.dependencies import reset_oauth_service
 reset_oauth_service()
 
 from core.logging_config import setup_logging
-from core.dependencies import set_rag_engine, set_ocr_service
+from core.dependencies import set_rag_engine, set_ocr_service, set_subscription_service
 from api.middleware.error_handler import add_exception_handlers
 from api.middleware.logging import LoggingMiddleware
 
 # Import routers
 from api.routes import (
     health, documents, queries, analytics,
-    agents, integrations, auth, storage, chat, services, google, notifications
+    agents, integrations, auth, storage, chat, services, google, notifications, subscription
 )
 from api.routes import settings as settings_router
 
@@ -167,6 +167,34 @@ async def lifespan(app: FastAPI):
             logger.info(f"[OK] Notification cleanup: removed {deleted_count} expired notifications")
         except Exception as cleanup_error:
             logger.error(f"[WARNING] Notification cleanup failed: {cleanup_error}")
+        
+        # Initialize subscription service
+        from domain.subscription.service import SubscriptionService
+        from infrastructure.storage.usage_tracker import UsageTracker
+        from domain.subscription.license_validator import LicenseValidator
+        
+        try:
+            usage_tracker = UsageTracker(settings.storage.working_dir)
+            license_validator = LicenseValidator()
+            subscription_service = SubscriptionService(
+                settings_storage=user_settings_storage,
+                usage_tracker=usage_tracker,
+                license_validator=license_validator,
+                notification_service=notification_service
+            )
+            
+            # Check tier expiry and initialize trial if needed
+            await subscription_service.check_tier_expiry()
+            
+            # Store globally for dependency injection
+            set_subscription_service(subscription_service)
+            
+            logger.info("[OK] Subscription service initialized")
+        except Exception as sub_error:
+            logger.error(f"[ERROR] Subscription service initialization failed: {sub_error}")
+            import traceback
+            logger.error(traceback.format_exc())
+            logger.warning("[WARNING] Subscription features disabled")
             
     except Exception as e:
         logger.error(f"[ERROR] Startup error: {e}")
@@ -225,6 +253,7 @@ def create_application() -> FastAPI:
     app.include_router(services.router)
     app.include_router(google.router)
     app.include_router(notifications.router)
+    app.include_router(subscription.router)
     
     return app
 

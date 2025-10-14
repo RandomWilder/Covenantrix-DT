@@ -1,5 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react'
 import { useChat } from '../../contexts/ChatContext'
+import { useSubscription } from '../../contexts/SubscriptionContext'
+import { useUpgradeModal } from '../../contexts/UpgradeModalContext'
 import { Bot, Settings } from '../../components/icons'
 import { ChatInput } from './ChatInput'
 import { Message } from './Message'
@@ -18,6 +20,9 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ width, disabled = false })
     selectedDocuments
   } = useChat()
   
+  const { subscription, canSendQuery, getRemainingQuota } = useSubscription()
+  const { showUpgradeModal } = useUpgradeModal()
+  
   const [isSubmitting, setIsSubmitting] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
@@ -28,6 +33,19 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ width, disabled = false })
 
   const handleSubmit = async (message: string) => {
     if (isSubmitting) return
+
+    // Check query limits before sending
+    const allowed = await canSendQuery()
+    if (!allowed) {
+      const remaining = getRemainingQuota('queries')
+      showUpgradeModal({
+        title: 'Query Limit Reached',
+        message: `You've used all your queries for the ${subscription?.tier} tier.`,
+        currentTier: subscription?.tier,
+        details: `Remaining queries: ${remaining}`
+      })
+      return
+    }
 
     setIsSubmitting(true)
 

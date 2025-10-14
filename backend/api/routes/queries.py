@@ -7,7 +7,7 @@ from typing import Optional, List
 import logging
 
 from domain.documents.service import DocumentService
-from core.dependencies import get_document_service
+from core.dependencies import get_document_service, get_subscription_service
 from api.schemas.documents import QueryRequest, QueryResponse
 
 router = APIRouter(prefix="/queries", tags=["queries"])
@@ -29,12 +29,33 @@ async def query_documents(
     Returns:
         Query response with answer
     """
+    # NEW: Check query limits
+    from core.dependencies import get_subscription_service
+    subscription_service = get_subscription_service()
+    
+    can_query, reason = await subscription_service.check_query_allowed()
+    if not can_query:
+        remaining = await subscription_service.get_remaining_queries()
+        raise HTTPException(
+            status_code=429,  # Too Many Requests
+            detail={
+                "error": "query_limit_reached",
+                "message": reason,
+                "remaining_monthly": remaining["monthly_remaining"],
+                "remaining_daily": remaining["daily_remaining"],
+                "reset_dates": remaining["reset_dates"]
+            }
+        )
+    
     try:
         result = await service.query_documents(
             query_text=request.query,
             mode=request.mode,
             document_ids=request.document_ids
         )
+        
+        # NEW: Record query usage
+        await subscription_service.record_query()
         
         return QueryResponse(
             success=True,

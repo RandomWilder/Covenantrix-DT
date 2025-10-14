@@ -4,7 +4,7 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { X, Save, RotateCcw, AlertCircle, CheckCircle, Key, Globe, Bot, Palette } from 'lucide-react';
+import { X, Save, RotateCcw, AlertCircle, CheckCircle, Key, Globe, Bot, Palette, CreditCard } from 'lucide-react';
 import { useSettings } from '../../hooks/useSettings';
 import { useToast } from '../../hooks/useToast';
 import { UserSettings } from '../../types/settings';
@@ -13,13 +13,14 @@ import LanguageTab from './LanguageTab';
 import RAGTab from './RAGTab';
 import AppearanceTab from './AppearanceTab';
 import SettingsBackup from './SettingsBackup';
+import { SubscriptionTab } from '../subscription/SubscriptionTab';
 
 interface SettingsModalProps {
   isOpen: boolean;
   onClose: () => void;
 }
 
-type TabType = 'api-keys' | 'language' | 'rag' | 'appearance' | 'backup';
+type TabType = 'api-keys' | 'subscription' | 'language' | 'rag' | 'appearance' | 'backup';
 
 const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
   const { 
@@ -51,17 +52,20 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
       // Validate ALL provided custom keys if in custom mode
       if (localSettings.api_keys?.mode === 'custom') {
         const validationResults = await validateAllApiKeys();
-        const hasInvalidKeys = Object.values(validationResults).some(result => result === false);
         
-        if (hasInvalidKeys) {
-          // Show specific error messages per key type
-          const keyErrors: string[] = [];
-          if (validationResults.openai === false) keyErrors.push('OpenAI');
-          if (validationResults.cohere === false) keyErrors.push('Cohere');
-          if (validationResults.google === false) keyErrors.push('Google');
-          
-          showToast(`Invalid API keys: ${keyErrors.join(', ')}. Please check and try again.`, 'error');
+        // CRITICAL: Only block save if REQUIRED keys (OpenAI) are invalid
+        // Optional keys (Cohere, Google) show warnings but don't block save
+        if (validationResults.openai === false) {
+          showToast('Invalid OpenAI API key. Please check and try again.', 'error');
           return;
+        }
+        
+        // Show warnings for invalid optional keys (don't block save)
+        if (validationResults.cohere === false && localSettings.api_keys.cohere) {
+          showToast('Warning: Cohere API key is invalid. Reranking features will not be available.', 'warning');
+        }
+        if (validationResults.google === false && localSettings.api_keys.google) {
+          showToast('Warning: Google API key is invalid. OCR features will not be available.', 'warning');
         }
         
         // Show warnings for missing optional keys
@@ -161,6 +165,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
 
   const tabs = [
     { id: 'api-keys', label: 'API Keys', icon: Key },
+    { id: 'subscription', label: 'Subscription', icon: CreditCard },
     { id: 'language', label: 'Language', icon: Globe },
     { id: 'rag', label: 'RAG Config', icon: Bot },
     { id: 'appearance', label: 'Appearance', icon: Palette },
@@ -316,6 +321,9 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
                       error={settingsError}
                       onClearError={clearError}
                     />
+                  )}
+                  {activeTab === 'subscription' && (
+                    <SubscriptionTab />
                   )}
                   {activeTab === 'language' && (
                     <LanguageTab
