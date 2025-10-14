@@ -78,6 +78,7 @@
 
 .notification-card-expanded {
   max-height: 1000px;
+  overflow: visible;
 }
 
 /* Action Buttons */

@@ -44,7 +44,7 @@ export function NotificationCard({
   return (
     <div
       className={`
-        notification-card border-b border-gray-200 dark:border-gray-700 
+        notification-card ${isExpanded ? 'notification-card-expanded' : ''} border-b border-gray-200 dark:border-gray-700 
         ${isUnread ? 'notification-card-unread bg-blue-50/50 dark:bg-blue-900/10' : 'bg-white dark:bg-gray-900'}
         transition-colors duration-200
       `}
