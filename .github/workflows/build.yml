@@ -191,6 +191,7 @@ jobs:
           OPENAI_API_KEY=${{ secrets.PROD_OPENAI_API_KEY }}
           COHERE_API_KEY=${{ secrets.PROD_COHERE_API_KEY }}
           GOOGLE_API_KEY=${{ secrets.PROD_GOOGLE_API_KEY }}
+          GOOGLE_CLIENT_ID=${{ secrets.PROD_GOOGLE_CLIENT_ID }}
           GOOGLE_CLIENT_SECRET=${{ secrets.PROD_GOOGLE_CLIENT_SECRET }}
           ENVIRONMENT=production
           EOF
