@@ -9,7 +9,7 @@ import { useTranslation } from 'react-i18next';
 import { AlertCircle, CheckCircle, Clock, Key } from 'lucide-react';
 
 export const SubscriptionTab: React.FC = () => {
-  const { subscription, usage, activateLicense, getRemainingQuota } = useSubscription();
+  const { subscription, usage, activateLicense } = useSubscription();
   const { t } = useTranslation();
   const [licenseKey, setLicenseKey] = useState('');
   const [isActivating, setIsActivating] = useState(false);
