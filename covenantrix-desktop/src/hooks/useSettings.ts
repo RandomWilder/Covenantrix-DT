@@ -37,24 +37,9 @@ export const useSettings = () => {
   useEffect(() => {
     const checkFirstRun = async () => {
       try {
-        // Check if settings exist and have default values
         if (context.settings) {
-          const hasCustomApiKeys = context.settings.api_keys.mode === 'custom' && 
-            (context.settings.api_keys.openai || context.settings.api_keys.cohere || context.settings.api_keys.google);
-          
-          const hasNonDefaultSettings = 
-            context.settings.language.preferred !== 'en' ||
-            context.settings.language.agent_language !== 'auto' ||
-            context.settings.language.ui_language !== 'auto' ||
-            context.settings.rag.search_mode !== 'hybrid' ||
-            context.settings.rag.top_k !== 5 ||
-            context.settings.rag.use_reranking !== true ||
-            context.settings.rag.enable_ocr !== true ||
-            context.settings.ui.theme !== 'system' ||
-            context.settings.ui.compact_mode !== false ||
-            context.settings.ui.font_size !== 'medium';
-
-          setIsFirstRun(!hasCustomApiKeys && !hasNonDefaultSettings);
+          // Simple check: if onboarding_completed is false/undefined, show onboarding
+          setIsFirstRun(!context.settings.onboarding_completed);
         }
       } catch (error) {
         console.error('Error checking first run status:', error);
@@ -246,7 +231,8 @@ export const useSettings = () => {
         searchMode: context.settings.rag.search_mode,
         topK: context.settings.rag.top_k,
         reranking: context.settings.rag.use_reranking,
-        ocr: context.settings.rag.enable_ocr
+        ocr: context.settings.rag.enable_ocr,
+        llmModel: context.settings.rag.llm_model
       },
       ui: {
         theme: context.settings.ui.theme,

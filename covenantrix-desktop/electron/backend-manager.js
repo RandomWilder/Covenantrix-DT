@@ -107,7 +107,7 @@ class BackendManager {
   /**
    * Wait for backend to be ready
    */
-  async waitForBackend(maxWaitTime = 30000) {
+  async waitForBackend(maxWaitTime = 120000) {
     const startTime = Date.now();
     const checkInterval = 500;
 

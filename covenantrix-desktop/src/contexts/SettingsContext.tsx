@@ -72,9 +72,18 @@ export const SettingsProvider: React.FC<SettingsProviderProps> = ({ children }) 
   const updateSettings = useCallback(async (updates: Partial<UserSettings>) => {
     if (!isElectron()) {
       envWarn('updateSettings: Not in Electron environment, only updating local state');
-      const updatedSettings = {
+      // Deep merge for nested objects to prevent data loss
+      const updatedSettings: UserSettings = {
         ...settings,
         ...updates,
+        // Explicitly merge nested objects
+        api_keys: updates.api_keys ? { ...settings?.api_keys, ...updates.api_keys } : settings?.api_keys,
+        rag: updates.rag ? { ...settings?.rag, ...updates.rag } : settings?.rag,
+        language: updates.language ? { ...settings?.language, ...updates.language } : settings?.language,
+        ui: updates.ui ? { ...settings?.ui, ...updates.ui } : settings?.ui,
+        privacy: updates.privacy ? { ...settings?.privacy, ...updates.privacy } : settings?.privacy,
+        profile: updates.profile ? { ...settings?.profile, ...updates.profile } : settings?.profile,
+        google_accounts: updates.google_accounts || settings?.google_accounts || [],
         last_updated: new Date().toISOString(),
         version: '1.0'
       } as UserSettings;
@@ -86,9 +95,18 @@ export const SettingsProvider: React.FC<SettingsProviderProps> = ({ children }) 
       setIsLoading(true);
       setError(null); // Clear previous errors
       
-      const updatedSettings = {
+      // Deep merge for nested objects to prevent data loss
+      const updatedSettings: UserSettings = {
         ...settings,
         ...updates,
+        // Explicitly merge nested objects
+        api_keys: updates.api_keys ? { ...settings?.api_keys, ...updates.api_keys } : settings?.api_keys,
+        rag: updates.rag ? { ...settings?.rag, ...updates.rag } : settings?.rag,
+        language: updates.language ? { ...settings?.language, ...updates.language } : settings?.language,
+        ui: updates.ui ? { ...settings?.ui, ...updates.ui } : settings?.ui,
+        privacy: updates.privacy ? { ...settings?.privacy, ...updates.privacy } : settings?.privacy,
+        profile: updates.profile ? { ...settings?.profile, ...updates.profile } : settings?.profile,
+        google_accounts: updates.google_accounts || settings?.google_accounts || [],
         last_updated: new Date().toISOString(),
         version: '1.0'
       } as UserSettings;
@@ -287,6 +305,7 @@ export const useSettings = (): SettingsContextValue => {
 // Default settings factory
 function getDefaultSettings(): UserSettings {
   return {
+    onboarding_completed: false,
     api_keys: {
       mode: 'default'
     },
@@ -294,7 +313,8 @@ function getDefaultSettings(): UserSettings {
       search_mode: 'hybrid',
       top_k: 5,
       use_reranking: true,
-      enable_ocr: true
+      enable_ocr: true,
+      llm_model: 'gpt-5-nano-2025-08-07'
     },
     language: {
       preferred: 'en',
@@ -312,6 +332,12 @@ function getDefaultSettings(): UserSettings {
       enable_cloud_backup: false,
       retain_history: true
     },
+    profile: {
+      first_name: undefined,
+      last_name: undefined,
+      email: undefined
+    },
+    google_accounts: [],
     version: '1.0',
     last_updated: new Date().toISOString()
   };
@@ -323,6 +349,7 @@ function validateAndNormalizeSettings(settings: any): UserSettings {
   
   // Ensure all required sections exist with proper structure
   return {
+    onboarding_completed: settings?.onboarding_completed ?? defaults.onboarding_completed,
     api_keys: {
       mode: settings?.api_keys?.mode || defaults.api_keys.mode,
       openai: settings?.api_keys?.openai,
@@ -333,7 +360,8 @@ function validateAndNormalizeSettings(settings: any): UserSettings {
       search_mode: settings?.rag?.search_mode || defaults.rag.search_mode,
       top_k: settings?.rag?.top_k || defaults.rag.top_k,
       use_reranking: settings?.rag?.use_reranking ?? defaults.rag.use_reranking,
-      enable_ocr: settings?.rag?.enable_ocr ?? defaults.rag.enable_ocr
+      enable_ocr: settings?.rag?.enable_ocr ?? defaults.rag.enable_ocr,
+      llm_model: settings?.rag?.llm_model || defaults.rag.llm_model
     },
     language: {
       preferred: settings?.language?.preferred || defaults.language.preferred,
@@ -351,6 +379,12 @@ function validateAndNormalizeSettings(settings: any): UserSettings {
       enable_cloud_backup: settings?.privacy?.enable_cloud_backup ?? defaults.privacy.enable_cloud_backup,
       retain_history: settings?.privacy?.retain_history ?? defaults.privacy.retain_history
     },
+    profile: {
+      first_name: settings?.profile?.first_name,
+      last_name: settings?.profile?.last_name,
+      email: settings?.profile?.email
+    },
+    google_accounts: Array.isArray(settings?.google_accounts) ? settings.google_accounts : [],
     version: settings?.version || defaults.version,
     last_updated: settings?.last_updated || new Date().toISOString()
   };

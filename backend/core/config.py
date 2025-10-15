@@ -75,7 +75,7 @@ class Settings(BaseSettings):
     # This is the system fallback key from .env
     openai_api_key: Optional[str] = Field(None, env="OPENAI_API_KEY")
     openai_model: str = Field("gpt-4o-mini", env="OPENAI_MODEL")
-    openai_embedding_model: str = Field("text-embedding-3-small", env="OPENAI_EMBEDDING_MODEL")
+    openai_embedding_model: str = Field("text-embedding-3-large", env="OPENAI_EMBEDDING_MODEL")
     openai_max_tokens: int = Field(4000, env="OPENAI_MAX_TOKENS")
     openai_temperature: float = Field(0.7, env="OPENAI_TEMPERATURE")
     

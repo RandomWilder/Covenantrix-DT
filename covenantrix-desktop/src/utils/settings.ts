@@ -10,6 +10,7 @@ import { UserSettings, Language, Theme, FontSize } from '../types/settings';
  */
 export const getDefaultSettings = (): UserSettings => {
   return {
+    onboarding_completed: false,
     api_keys: {
       mode: 'default'
     },
@@ -17,7 +18,8 @@ export const getDefaultSettings = (): UserSettings => {
       search_mode: 'hybrid',
       top_k: 5,
       use_reranking: true,
-      enable_ocr: true
+      enable_ocr: true,
+      llm_model: 'gpt-5-nano-2025-08-07'
     },
     language: {
       preferred: 'en',
@@ -53,17 +55,19 @@ export const validateAndNormalizeSettings = (settings: any): UserSettings => {
   const defaults = getDefaultSettings();
   
   return {
+    onboarding_completed: settings?.onboarding_completed ?? defaults.onboarding_completed,
     api_keys: {
       mode: settings?.api_keys?.mode || defaults.api_keys.mode,
       openai: settings?.api_keys?.openai,
       cohere: settings?.api_keys?.cohere,
-      google_vision: settings?.api_keys?.google_vision
+      google: settings?.api_keys?.google
     },
     rag: {
       search_mode: settings?.rag?.search_mode || defaults.rag.search_mode,
       top_k: Math.max(1, Math.min(20, settings?.rag?.top_k || defaults.rag.top_k)),
       use_reranking: settings?.rag?.use_reranking ?? defaults.rag.use_reranking,
-      enable_ocr: settings?.rag?.enable_ocr ?? defaults.rag.enable_ocr
+      enable_ocr: settings?.rag?.enable_ocr ?? defaults.rag.enable_ocr,
+      llm_model: settings?.rag?.llm_model || defaults.rag.llm_model
     },
     language: {
       preferred: settings?.language?.preferred || defaults.language.preferred,
@@ -200,8 +204,8 @@ export const getSettingsValidationWarnings = (settings: any): string[] => {
     warnings.push('Cohere API key recommended for reranking feature');
   }
 
-  if (settings.rag?.enable_ocr && !settings.api_keys?.google_vision) {
-    warnings.push('Google Vision API key required for OCR feature');
+  if (settings.rag?.enable_ocr && !settings.api_keys?.google) {
+    warnings.push('Google API key required for OCR feature');
   }
 
   if (settings.language?.preferred === 'he' && settings.language?.agent_language === 'auto') {
@@ -222,7 +226,7 @@ export const sanitizeSettingsForExport = (settings: UserSettings): Partial<UserS
       // Don't export actual API keys
       openai: settings.api_keys.openai ? '***' : undefined,
       cohere: settings.api_keys.cohere ? '***' : undefined,
-      google_vision: settings.api_keys.google_vision ? '***' : undefined
+      google: settings.api_keys.google ? '***' : undefined
     }
   };
 };
@@ -242,6 +246,7 @@ export const hasCustomizedSettings = (settings: UserSettings): boolean => {
     settings.rag.top_k !== defaults.rag.top_k ||
     settings.rag.use_reranking !== defaults.rag.use_reranking ||
     settings.rag.enable_ocr !== defaults.rag.enable_ocr ||
+    settings.rag.llm_model !== defaults.rag.llm_model ||
     settings.ui.theme !== defaults.ui.theme ||
     settings.ui.compact_mode !== defaults.ui.compact_mode ||
     settings.ui.font_size !== defaults.ui.font_size ||
@@ -258,7 +263,7 @@ export const getSettingsSummary = (settings: UserSettings) => {
     apiKeys: {
       mode: settings.api_keys.mode,
       hasCustomKeys: settings.api_keys.mode === 'custom' && 
-        (settings.api_keys.openai || settings.api_keys.cohere || settings.api_keys.google_vision)
+        (settings.api_keys.openai || settings.api_keys.cohere || settings.api_keys.google)
     },
     language: {
       ui: settings.language.ui_language,
@@ -269,7 +274,8 @@ export const getSettingsSummary = (settings: UserSettings) => {
       searchMode: settings.rag.search_mode,
       topK: settings.rag.top_k,
       reranking: settings.rag.use_reranking,
-      ocr: settings.rag.enable_ocr
+      ocr: settings.rag.enable_ocr,
+      llmModel: settings.rag.llm_model
     },
     ui: {
       theme: settings.ui.theme,

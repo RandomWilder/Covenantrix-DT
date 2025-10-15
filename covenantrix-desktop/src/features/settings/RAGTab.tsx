@@ -4,8 +4,8 @@
  */
 
 import React from 'react';
-import { Search, Zap, Settings, FileText, Globe } from 'lucide-react';
-import { RAGSettings, SearchMode } from '../../types/settings';
+import { Search, Zap, Settings, FileText, Globe, Brain } from 'lucide-react';
+import { RAGSettings, SearchMode, LLMModel } from '../../types/settings';
 
 interface RAGTabProps {
   settings: RAGSettings;
@@ -68,6 +68,13 @@ const RAGTab: React.FC<RAGTabProps> = ({ settings, onChange }) => {
     });
   };
 
+  const handleModelChange = (model: LLMModel) => {
+    onChange({
+      ...settings,
+      llm_model: model
+    });
+  };
+
   return (
     <div className="space-y-6">
       <div>
@@ -121,6 +128,40 @@ const RAGTab: React.FC<RAGTabProps> = ({ settings, onChange }) => {
               </div>
             </label>
           ))}
+        </div>
+      </div>
+
+      {/* LLM Model Selection */}
+      <div className="space-y-4">
+        <div className="flex items-center space-x-2">
+          <Brain className="w-5 h-5 text-purple-500" />
+          <h4 className="text-md font-medium text-gray-900 dark:text-white">
+            LLM Model
+          </h4>
+        </div>
+        <p className="text-sm text-gray-600 dark:text-gray-400">
+          Choose the OpenAI model for generating responses from your documents.
+        </p>
+        <select
+          value={settings.llm_model}
+          onChange={(e) => handleModelChange(e.target.value as LLMModel)}
+          className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+        >
+          <option value="gpt-5-pro-2025-10-06">GPT-5 Pro (Premium, Most Capable)</option>
+          <option value="gpt-5-2025-08-07">GPT-5 (Latest, High Performance)</option>
+          <option value="gpt-5-mini-2025-08-07">GPT-5 Mini (Balanced, Recommended)</option>
+          <option value="gpt-5-nano-2025-08-07">GPT-5 Nano (Fast, Cost-Effective, Default)</option>
+          <option value="gpt-4o">GPT-4o (Multimodal, Current Production)</option>
+          <option value="gpt-4o-mini">GPT-4o Mini (Fast, Efficient)</option>
+          <option value="gpt-4-turbo">GPT-4 Turbo (Stable, Enhanced)</option>
+        </select>
+        <div className="text-xs text-gray-500 dark:text-gray-400">
+          <p>Different models offer different trade-offs:</p>
+          <ul className="mt-1 space-y-1 ml-4">
+            <li>• <strong>Pro/Standard:</strong> Best quality, slower, higher cost</li>
+            <li>• <strong>Mini/Nano:</strong> Fast responses, lower cost, good quality</li>
+            <li>• <strong>GPT-4 series:</strong> Proven stability, multimodal capabilities</li>
+          </ul>
         </div>
       </div>
 
@@ -231,6 +272,8 @@ const RAGTab: React.FC<RAGTabProps> = ({ settings, onChange }) => {
               <li>• Higher top-K values give more comprehensive results but slower responses</li>
               <li>• Reranking improves relevance but requires additional API calls</li>
               <li>• OCR is useful for scanned documents but increases processing time</li>
+              <li>• Premium models (Pro/Standard) provide better quality but cost more and are slower</li>
+              <li>• Nano/Mini models are recommended for fast, cost-effective responses</li>
             </ul>
           </div>
         </div>

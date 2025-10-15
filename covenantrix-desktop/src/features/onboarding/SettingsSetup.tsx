@@ -13,7 +13,7 @@ import { ProfileSetupStep } from './ProfileSetupStep';
 
 interface SettingsSetupProps {
   onComplete: () => void;
-  onSkip: () => void;
+  onSkip?: () => void;
 }
 
 type SetupStep = 'welcome' | 'profile' | 'api-keys' | 'language' | 'rag' | 'appearance' | 'complete';
@@ -23,7 +23,7 @@ const SettingsSetup: React.FC<SettingsSetupProps> = ({ onComplete, onSkip }) => 
   const { showToast } = useToast();
   const [currentStep, setCurrentStep] = useState<SetupStep>('welcome');
   const [isValidating, setIsValidating] = useState(false);
-  const [validationResults, setValidationResults] = useState<Record<string, boolean>>({});
+  const [localSettings, setLocalSettings] = useState<Partial<UserSettings>>({});
   const defaults = getDefaultSettings();
 
   const steps = [
@@ -39,6 +39,18 @@ const SettingsSetup: React.FC<SettingsSetupProps> = ({ onComplete, onSkip }) => 
   const currentStepIndex = steps.findIndex(step => step.id === currentStep);
   const progress = ((currentStepIndex + 1) / steps.length) * 100;
 
+  // Get effective settings (deep merge to prevent data loss)
+  const effectiveSettings: UserSettings = {
+    ...settings,
+    ...localSettings,
+    // Explicitly merge nested objects
+    api_keys: localSettings.api_keys ? { ...settings?.api_keys, ...localSettings.api_keys } : settings?.api_keys,
+    rag: localSettings.rag ? { ...settings?.rag, ...localSettings.rag } : settings?.rag,
+    language: localSettings.language ? { ...settings?.language, ...localSettings.language } : settings?.language,
+    ui: localSettings.ui ? { ...settings?.ui, ...localSettings.ui } : settings?.ui,
+    profile: localSettings.profile ? { ...settings?.profile, ...localSettings.profile } : settings?.profile,
+  } as UserSettings;
+
   const handleNext = async () => {
     if (currentStep === 'api-keys') {
       // Validate API keys before proceeding
@@ -46,7 +58,6 @@ const SettingsSetup: React.FC<SettingsSetupProps> = ({ onComplete, onSkip }) => 
       try {
         const isValid = await validateApiKeys();
         if (isValid) {
-          setValidationResults({ ...validationResults, apiKeys: true });
           setCurrentStep('language');
         } else {
           showToast('Please configure valid API keys to continue', 'error');
@@ -59,11 +70,47 @@ const SettingsSetup: React.FC<SettingsSetupProps> = ({ onComplete, onSkip }) => 
         setIsValidating(false);
       }
     } else if (currentStep === 'complete') {
-      onComplete();
+      await handleComplete();
     } else {
       const nextIndex = currentStepIndex + 1;
       if (nextIndex < steps.length) {
         setCurrentStep(steps[nextIndex].id as SetupStep);
+      }
+    }
+  };
+
+  const handleComplete = async () => {
+    try {
+      // Merge all local state changes and mark onboarding as completed
+      const finalSettings = {
+        ...localSettings,
+        onboarding_completed: true
+      };
+      await updateSettings(finalSettings);
+      onComplete();
+    } catch (error) {
+      console.error('Error completing onboarding:', error);
+      showToast('Failed to save settings', 'error');
+    }
+  };
+
+  const handleSkip = async () => {
+    try {
+      // Mark onboarding as completed even when skipped
+      // User chose to skip, so don't show onboarding again
+      await updateSettings({ onboarding_completed: true });
+      if (onSkip) {
+        onSkip();
+      } else {
+        onComplete();
+      }
+    } catch (error) {
+      console.error('Error skipping onboarding:', error);
+      // Still call completion handlers even if save failed
+      if (onSkip) {
+        onSkip();
+      } else {
+        onComplete();
       }
     }
   };
@@ -76,7 +123,8 @@ const SettingsSetup: React.FC<SettingsSetupProps> = ({ onComplete, onSkip }) => 
   };
 
   const handleSettingsChange = (updates: Partial<UserSettings>) => {
-    updateSettings(updates);
+    // Update local state only (soft save)
+    setLocalSettings(prev => ({ ...prev, ...updates }));
   };
 
   const renderStepContent = () => {
@@ -111,7 +159,7 @@ const SettingsSetup: React.FC<SettingsSetupProps> = ({ onComplete, onSkip }) => 
       case 'profile':
         return (
           <ProfileSetupStep
-            initialProfile={settings?.profile}
+            initialProfile={effectiveSettings?.profile}
             onSave={(profile) => handleSettingsChange({ profile })}
           />
         );
@@ -142,7 +190,7 @@ const SettingsSetup: React.FC<SettingsSetupProps> = ({ onComplete, onSkip }) => 
                     api_keys: { mode: 'default' } 
                   })}
                   className={`w-full p-3 rounded-lg border-2 transition-colors ${
-                    settings?.api_keys?.mode === 'default'
+                    effectiveSettings?.api_keys?.mode === 'default'
                       ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20'
                       : 'border-gray-200 dark:border-gray-600 hover:border-gray-300 dark:hover:border-gray-500'
                   }`}
@@ -164,7 +212,7 @@ const SettingsSetup: React.FC<SettingsSetupProps> = ({ onComplete, onSkip }) => 
                     api_keys: { mode: 'custom' } 
                   })}
                   className={`w-full p-3 rounded-lg border-2 transition-colors ${
-                    settings?.api_keys?.mode === 'custom'
+                    effectiveSettings?.api_keys?.mode === 'custom'
                       ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20'
                       : 'border-gray-200 dark:border-gray-600 hover:border-gray-300 dark:hover:border-gray-500'
                   }`}
@@ -177,7 +225,7 @@ const SettingsSetup: React.FC<SettingsSetupProps> = ({ onComplete, onSkip }) => 
               </div>
             </div>
 
-            {settings?.api_keys?.mode === 'custom' && (
+            {effectiveSettings?.api_keys?.mode === 'custom' && (
               <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4">
                 <div className="flex items-start space-x-3">
                   <div className="text-yellow-600 dark:text-yellow-400">⚠️</div>
@@ -215,11 +263,11 @@ const SettingsSetup: React.FC<SettingsSetupProps> = ({ onComplete, onSkip }) => 
                   Interface Language
                 </label>
                 <select
-                  value={settings?.language?.ui_language || 'auto'}
+                  value={effectiveSettings?.language?.ui_language || 'auto'}
                   onChange={(e) => handleSettingsChange({
                     language: {
                       ...defaults.language,
-                      ...settings?.language,
+                      ...effectiveSettings?.language,
                       ui_language: e.target.value as 'auto' | 'en' | 'es'
                     }
                   })}
@@ -236,11 +284,11 @@ const SettingsSetup: React.FC<SettingsSetupProps> = ({ onComplete, onSkip }) => 
                   AI Response Language
                 </label>
                 <select
-                  value={settings?.language?.agent_language || 'auto'}
+                  value={effectiveSettings?.language?.agent_language || 'auto'}
                   onChange={(e) => handleSettingsChange({
                     language: {
                       ...defaults.language,
-                      ...settings?.language,
+                      ...effectiveSettings?.language,
                       agent_language: e.target.value as 'auto' | 'en' | 'es' | 'fr' | 'he' | 'de'
                     }
                   })}
@@ -279,11 +327,11 @@ const SettingsSetup: React.FC<SettingsSetupProps> = ({ onComplete, onSkip }) => 
                   Search Mode
                 </label>
                 <select
-                  value={settings?.rag?.search_mode || 'hybrid'}
+                  value={effectiveSettings?.rag?.search_mode || 'hybrid'}
                   onChange={(e) => handleSettingsChange({
                     rag: {
                       ...defaults.rag,
-                      ...settings?.rag,
+                      ...effectiveSettings?.rag,
                       search_mode: e.target.value as 'naive' | 'local' | 'global' | 'hybrid'
                     }
                   })}
@@ -303,11 +351,11 @@ const SettingsSetup: React.FC<SettingsSetupProps> = ({ onComplete, onSkip }) => 
                 <input
                   type="checkbox"
                   id="enable-ocr"
-                  checked={settings?.rag?.enable_ocr ?? true}
+                  checked={effectiveSettings?.rag?.enable_ocr ?? true}
                   onChange={(e) => handleSettingsChange({
                     rag: {
                       ...defaults.rag,
-                      ...settings?.rag,
+                      ...effectiveSettings?.rag,
                       enable_ocr: e.target.checked
                     }
                   })}
@@ -322,11 +370,11 @@ const SettingsSetup: React.FC<SettingsSetupProps> = ({ onComplete, onSkip }) => 
                 <input
                   type="checkbox"
                   id="use-reranking"
-                  checked={settings?.rag?.use_reranking ?? true}
+                  checked={effectiveSettings?.rag?.use_reranking ?? true}
                   onChange={(e) => handleSettingsChange({
                     rag: {
                       ...defaults.rag,
-                      ...settings?.rag,
+                      ...effectiveSettings?.rag,
                       use_reranking: e.target.checked
                     }
                   })}
@@ -371,12 +419,12 @@ const SettingsSetup: React.FC<SettingsSetupProps> = ({ onComplete, onSkip }) => 
                       onClick={() => handleSettingsChange({
                         ui: {
                           ...defaults.ui,
-                          ...settings?.ui,
+                          ...effectiveSettings?.ui,
                           theme: theme.value as 'light' | 'dark' | 'system'
                         }
                       })}
                       className={`p-3 rounded-lg border-2 transition-colors ${
-                        settings?.ui?.theme === theme.value
+                        effectiveSettings?.ui?.theme === theme.value
                           ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20'
                           : 'border-gray-200 dark:border-gray-600 hover:border-gray-300 dark:hover:border-gray-500'
                       }`}
@@ -394,11 +442,11 @@ const SettingsSetup: React.FC<SettingsSetupProps> = ({ onComplete, onSkip }) => 
                 <input
                   type="checkbox"
                   id="compact-mode"
-                  checked={settings?.ui?.compact_mode ?? false}
+                  checked={effectiveSettings?.ui?.compact_mode ?? false}
                   onChange={(e) => handleSettingsChange({
                     ui: {
                       ...defaults.ui,
-                      ...settings?.ui,
+                      ...effectiveSettings?.ui,
                       compact_mode: e.target.checked
                     }
                   })}
@@ -454,7 +502,7 @@ const SettingsSetup: React.FC<SettingsSetupProps> = ({ onComplete, onSkip }) => 
               Initial Setup
             </h1>
             <button
-              onClick={onSkip}
+              onClick={handleSkip}
               className="text-sm text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
             >
               Skip Setup
@@ -519,7 +567,7 @@ const SettingsSetup: React.FC<SettingsSetupProps> = ({ onComplete, onSkip }) => 
             <div className="flex items-center space-x-3">
               {currentStep === 'complete' ? (
                 <button
-                  onClick={onComplete}
+                  onClick={handleComplete}
                   className="flex items-center space-x-2 px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
                 >
                   <CheckCircle className="w-4 h-4" />

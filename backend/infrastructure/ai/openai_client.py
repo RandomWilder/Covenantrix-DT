@@ -114,7 +114,7 @@ class OpenAIClient:
     async def create_embedding(
         self,
         text: str,
-        model: str = "text-embedding-3-small"
+        model: str = "text-embedding-3-large"
     ) -> List[float]:
         """
         Create text embedding

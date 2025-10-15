@@ -146,9 +146,12 @@ class RAGEngine:
             
             messages.append({"role": "user", "content": prompt})
             
+            # Get model from settings or use default
+            model = self.user_settings.get("rag", {}).get("llm_model", "gpt-5-nano-2025-08-07")
+            
             # Call OpenAI with filtered parameters
             response = await client.chat.completions.create(
-                model="gpt-4o-mini",
+                model=model,
                 messages=messages,
                 **openai_kwargs
             )
@@ -208,9 +211,12 @@ class RAGEngine:
             
             messages.append({"role": "user", "content": prompt})
             
+            # Get model from settings or use default
+            model = self.user_settings.get("rag", {}).get("llm_model", "gpt-5-nano-2025-08-07")
+            
             # Call OpenAI with streaming enabled
             response = await client.chat.completions.create(
-                model="gpt-4o-mini",
+                model=model,
                 messages=messages,
                 stream=True,
                 **openai_kwargs
@@ -558,6 +564,9 @@ class RAGEngine:
             self.top_k = rag_settings.get("top_k", 5)
             self.use_reranking = rag_settings.get("use_reranking", True)
             
+            # Store LLM model setting
+            self.llm_model = rag_settings.get("llm_model", "gpt-5-nano-2025-08-07")
+            
             # Apply language settings
             language_settings = settings.get("language", {})
             self.preferred_language = language_settings.get("preferred", "en")
@@ -574,7 +583,7 @@ class RAGEngine:
                 if api_keys.get("cohere"):
                     os.environ["COHERE_API_KEY"] = api_keys["cohere"]
             
-            self.logger.info(f"Settings applied: mode={self.search_mode}, top_k={self.top_k}, reranking={self.use_reranking}")
+            self.logger.info(f"Settings applied: mode={self.search_mode}, top_k={self.top_k}, reranking={self.use_reranking}, llm_model={self.llm_model}")
             
         except Exception as e:
             self.logger.error(f"Failed to apply settings: {e}")
@@ -620,6 +629,7 @@ class RAGEngine:
             "search_mode": getattr(self, 'search_mode', 'hybrid'),
             "top_k": getattr(self, 'top_k', 5),
             "use_reranking": getattr(self, 'use_reranking', True),
+            "llm_model": getattr(self, 'llm_model', 'gpt-5-nano-2025-08-07'),
             "preferred_language": getattr(self, 'preferred_language', 'en'),
             "agent_language": getattr(self, 'agent_language', 'auto')
         }

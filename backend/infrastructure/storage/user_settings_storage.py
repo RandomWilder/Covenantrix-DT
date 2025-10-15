@@ -6,7 +6,7 @@ import json
 import logging
 from pathlib import Path
 from typing import Optional, Dict, Any
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from api.schemas.settings import UserSettings
 from core.config import get_settings
@@ -161,7 +161,8 @@ class UserSettingsStorage:
                     data["ui"] = {
                         "theme": "system",
                         "compact_mode": False,
-                        "font_size": "medium"
+                        "font_size": "medium",
+                        "zoom_level": 0.8
                     }
                 
                 if "privacy" not in data:
@@ -172,6 +173,12 @@ class UserSettingsStorage:
                     }
                 
                 data["version"] = "1.0"
+            
+            # Ensure zoom_level exists in existing UI sections
+            if "ui" in data and "zoom_level" not in data["ui"]:
+                logger.info("Adding zoom_level to existing UI settings")
+                data["ui"]["zoom_level"] = 0.8
+                needs_save = True
             
             # Add profile section if missing (even for v1.0 settings)
             if "profile" not in data:
@@ -192,17 +199,45 @@ class UserSettingsStorage:
             # Add subscription section if missing
             if "subscription" not in data:
                 logger.info("Adding subscription section to settings")
-                from domain.subscription.tier_config import get_tier_features
+                from domain.subscription.tier_config import get_tier_features, TIER_LIMITS
+                
+                # Initialize trial period immediately during migration
+                now = datetime.utcnow()
+                trial_duration = TIER_LIMITS["trial"]["duration_days"]
+                
                 data["subscription"] = {
                     "tier": "trial",
                     "license_key": None,
-                    "trial_started_at": None,
-                    "trial_expires_at": None,
+                    "trial_started_at": now.isoformat(),
+                    "trial_expires_at": (now + timedelta(days=trial_duration)).isoformat(),
                     "grace_period_started_at": None,
                     "grace_period_expires_at": None,
                     "features": get_tier_features("trial"),
-                    "last_tier_change": None
+                    "last_tier_change": now.isoformat()
                 }
+                needs_save = True
+                logger.info(f"Trial period initialized during migration: {trial_duration} days from {now.isoformat()}")
+            
+            # Fix existing trial subscriptions missing dates
+            if "subscription" in data:
+                subscription = data["subscription"]
+                if subscription.get("tier") == "trial" and subscription.get("trial_started_at") is None:
+                    logger.info("Fixing existing trial subscription with missing dates")
+                    from domain.subscription.tier_config import TIER_LIMITS
+                    now = datetime.utcnow()
+                    trial_duration = TIER_LIMITS["trial"]["duration_days"]
+                    subscription["trial_started_at"] = now.isoformat()
+                    subscription["trial_expires_at"] = (now + timedelta(days=trial_duration)).isoformat()
+                    if subscription.get("last_tier_change") is None:
+                        subscription["last_tier_change"] = now.isoformat()
+                    needs_save = True
+            
+            # Add onboarding_completed flag if missing
+            # For existing installations, set to False to preserve current experience
+            # (users won't see onboarding again unless they reset this flag)
+            if "onboarding_completed" not in data:
+                logger.info("Adding onboarding_completed flag to settings")
+                data["onboarding_completed"] = False
                 needs_save = True
             
             return data, needs_save

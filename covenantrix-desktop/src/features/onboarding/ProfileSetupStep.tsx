@@ -3,7 +3,7 @@
  * Optional profile information collection during onboarding
  */
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { User, Mail } from 'lucide-react';
 import { ProfileSettings } from '../../types/settings';
 
@@ -16,11 +16,22 @@ export const ProfileSetupStep: React.FC<ProfileSetupStepProps> = ({
   initialProfile, 
   onSave 
 }) => {
-  const [profile, setProfile] = useState<ProfileSettings>(initialProfile || {
+  const [profile, setProfile] = useState<ProfileSettings>({
     first_name: '',
     last_name: '',
     email: ''
   });
+
+  // Sync with incoming props (fixes the loading issue)
+  useEffect(() => {
+    if (initialProfile) {
+      setProfile({
+        first_name: initialProfile.first_name || '',
+        last_name: initialProfile.last_name || '',
+        email: initialProfile.email || ''
+      });
+    }
+  }, [initialProfile]);
 
   const handleChange = (field: keyof ProfileSettings, value: string) => {
     const updatedProfile = {
@@ -29,7 +40,7 @@ export const ProfileSetupStep: React.FC<ProfileSetupStepProps> = ({
     };
     setProfile(updatedProfile);
     
-    // Auto-save on change - clean up empty strings to undefined
+    // Soft save - update parent state only (not backend)
     const cleanedProfile: ProfileSettings = {
       first_name: updatedProfile.first_name?.trim() || undefined,
       last_name: updatedProfile.last_name?.trim() || undefined,

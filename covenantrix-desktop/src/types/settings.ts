@@ -11,12 +11,20 @@ export type Language = 'en' | 'es' | 'fr' | 'he' | 'de';
 export type Theme = 'light' | 'dark' | 'system';
 export type FontSize = 'small' | 'medium' | 'large';
 
+export type LLMModel = 
+  | 'gpt-5-pro-2025-10-06'
+  | 'gpt-5-2025-08-07'
+  | 'gpt-5-mini-2025-08-07'
+  | 'gpt-5-nano-2025-08-07'
+  | 'gpt-4o'
+  | 'gpt-4o-mini'
+  | 'gpt-4-turbo';
+
 export interface ApiKeySettings {
   mode: ApiKeyMode;
   openai?: string;        // Only if mode === 'custom'
   cohere?: string;        // Only if mode === 'custom'  
-  google?: string;        // Only if mode === 'custom'
-  google_vision?: string; // Only if mode === 'custom' (for OCR)
+  google?: string;        // Only if mode === 'custom' (used for both Drive and Vision OCR)
 }
 
 export interface RAGSettings {
@@ -24,6 +32,7 @@ export interface RAGSettings {
   top_k: number;           // 1-20
   use_reranking: boolean;
   enable_ocr: boolean;
+  llm_model: LLMModel;
 }
 
 export interface LanguageSettings {
@@ -62,6 +71,7 @@ export interface GoogleAccountSettings {
 }
 
 export interface UserSettings {
+  onboarding_completed?: boolean;
   api_keys: ApiKeySettings;
   rag: RAGSettings;
   language: LanguageSettings;

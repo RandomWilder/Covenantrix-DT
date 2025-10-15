@@ -48,7 +48,7 @@ async def _validate_openai_key(api_key: str) -> tuple[bool, Optional[str]]:
         try:
             # Make a minimal API call to verify the key
             await client.embeddings.create(
-                model="text-embedding-3-small",
+                model="text-embedding-3-large",
                 input="test"
             )
             logger.info("API key validation: type=openai, result=valid")

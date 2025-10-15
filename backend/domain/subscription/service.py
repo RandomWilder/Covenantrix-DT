@@ -147,8 +147,11 @@ class SubscriptionService:
         
         # Initialize trial if first launch
         if subscription.tier == "trial" and subscription.trial_started_at is None:
+            logger.info("Trial tier detected without start date, calling _initialize_trial()")
             await self._initialize_trial()
             changed = True
+        else:
+            logger.debug(f"Trial status: tier={subscription.tier}, started_at={subscription.trial_started_at}")
         
         # Check trial expiry
         if subscription.tier == "trial" and subscription.trial_expires_at:
@@ -331,6 +334,7 @@ class SubscriptionService:
     
     async def _initialize_trial(self) -> None:
         """Initialize trial period on first launch"""
+        logger.info("_initialize_trial() called - checking if trial needs initialization")
         settings = await self.settings_storage.load_settings()
         
         if settings.subscription.trial_started_at is not None:

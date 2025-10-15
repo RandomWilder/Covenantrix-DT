@@ -4,10 +4,11 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { X, Save, RotateCcw, AlertCircle, CheckCircle, Key, Globe, Bot, Palette, CreditCard } from 'lucide-react';
+import { X, Save, RotateCcw, AlertCircle, CheckCircle, Key, Globe, Bot, Palette, CreditCard, User } from 'lucide-react';
 import { useSettings } from '../../hooks/useSettings';
 import { useToast } from '../../hooks/useToast';
 import { UserSettings } from '../../types/settings';
+import AccountSettings from './AccountSettings';
 import ApiKeysTab from './ApiKeysTab';
 import LanguageTab from './LanguageTab';
 import RAGTab from './RAGTab';
@@ -20,7 +21,7 @@ interface SettingsModalProps {
   onClose: () => void;
 }
 
-type TabType = 'api-keys' | 'subscription' | 'language' | 'rag' | 'appearance' | 'backup';
+type TabType = 'account' | 'api-keys' | 'subscription' | 'language' | 'rag' | 'appearance' | 'backup';
 
 const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
   const { 
@@ -36,7 +37,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
     clearError
   } = useSettings();
   const { showToast } = useToast();
-  const [activeTab, setActiveTab] = useState<TabType>('api-keys');
+  const [activeTab, setActiveTab] = useState<TabType>('account');
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isValidating, setIsValidating] = useState(false);
@@ -164,6 +165,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
   }
 
   const tabs = [
+    { id: 'account', label: 'Account', icon: User },
     { id: 'api-keys', label: 'API Keys', icon: Key },
     { id: 'subscription', label: 'Subscription', icon: CreditCard },
     { id: 'language', label: 'Language', icon: Globe },
@@ -314,6 +316,12 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
               
               {localSettings ? (
                 <>
+                  {activeTab === 'account' && (
+                    <AccountSettings
+                      settings={localSettings.profile || { first_name: undefined, last_name: undefined, email: undefined }}
+                      onChange={(updates: any) => handleSettingsChange({ profile: updates })}
+                    />
+                  )}
                   {activeTab === 'api-keys' && (
                     <ApiKeysTab
                       settings={localSettings.api_keys || { mode: 'default' }}
@@ -333,7 +341,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
                   )}
                   {activeTab === 'rag' && (
                     <RAGTab
-                      settings={localSettings.rag || { search_mode: 'hybrid', top_k: 5, use_reranking: true, enable_ocr: true }}
+                      settings={localSettings.rag || { search_mode: 'hybrid', top_k: 5, use_reranking: true, enable_ocr: true, llm_model: 'gpt-5-nano-2025-08-07' }}
                       onChange={(updates: any) => handleSettingsChange({ rag: updates })}
                     />
                   )}

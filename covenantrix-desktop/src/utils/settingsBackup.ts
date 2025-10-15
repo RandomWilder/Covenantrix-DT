@@ -213,8 +213,8 @@ export const compareSettings = (
     if (backup.api_keys.cohere !== current.api_keys.cohere) {
       changed.push('Cohere API Key');
     }
-    if (backup.api_keys.google_vision !== current.api_keys.google_vision) {
-      changed.push('Google Vision API Key');
+    if (backup.api_keys.google !== current.api_keys.google) {
+      changed.push('Google API Key');
     }
   }
 

@@ -21,6 +21,21 @@ class SearchMode(str, Enum):
     HYBRID = "hybrid"
 
 
+class LLMModel(str, Enum):
+    """Available OpenAI models for RAG generation"""
+    
+    # Premium (Latest)
+    GPT_5_PRO = "gpt-5-pro-2025-10-06"
+    GPT_5 = "gpt-5-2025-08-07"
+    GPT_5_MINI = "gpt-5-mini-2025-08-07"
+    GPT_5_NANO = "gpt-5-nano-2025-08-07"  # Default
+    
+    # Standard (Current Production)
+    GPT_4O = "gpt-4o"
+    GPT_4O_MINI = "gpt-4o-mini"
+    GPT_4_TURBO = "gpt-4-turbo"
+
+
 class LanguageCode(str, Enum):
     """Supported language codes"""
     EN = "en"
@@ -77,6 +92,7 @@ class RAGSettings(BaseModel):
     top_k: int = Field(default=5, ge=1, le=20, description="Number of top results to retrieve")
     use_reranking: bool = Field(default=True, description="Enable Cohere reranking")
     enable_ocr: bool = Field(default=True, description="Enable Google Vision OCR")
+    llm_model: LLMModel = Field(default=LLMModel.GPT_5_NANO, description="LLM model for RAG generation")
 
     @field_validator("use_reranking")
     @classmethod
@@ -109,6 +125,7 @@ class UISettings(BaseModel):
     theme: Theme = Field(default=Theme.SYSTEM, description="UI theme")
     compact_mode: bool = Field(default=False, description="Enable compact mode")
     font_size: FontSize = Field(default=FontSize.MEDIUM, description="Font size")
+    zoom_level: float = Field(default=0.8, ge=0.5, le=2.0, description="Zoom level (50%-200%)")
 
 
 class PrivacySettings(BaseModel):
@@ -125,7 +142,7 @@ class FeatureFlags(BaseModel):
     max_total_storage_mb: int = Field(default=30, description="Max total storage")
     max_queries_monthly: int = Field(default=-1, description="Monthly query limit (-1 = unlimited)")
     max_queries_daily: int = Field(default=-1, description="Daily query limit (-1 = unlimited)")
-    use_default_keys: bool = Field(default=False, description="Allow default API keys")
+    use_default_keys: bool = Field(default=True, description="Allow default API keys")
 
 
 class SubscriptionSettings(BaseModel):
@@ -165,6 +182,7 @@ class GoogleAccountSettings(BaseModel):
 
 class UserSettings(BaseModel):
     """Complete user settings"""
+    onboarding_completed: bool = Field(default=False, description="Whether initial onboarding completed")
     api_keys: ApiKeySettings = Field(default_factory=ApiKeySettings, description="API key settings")
     rag: RAGSettings = Field(default_factory=RAGSettings, description="RAG configuration")
     language: LanguageSettings = Field(default_factory=LanguageSettings, description="Language preferences")
