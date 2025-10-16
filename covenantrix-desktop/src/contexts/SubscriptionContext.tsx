@@ -13,6 +13,7 @@ export const SubscriptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
   const [subscription, setSubscription] = useState<SubscriptionSettings | null>(null);
   const [usage, setUsage] = useState<UsageStats | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [triggerConfetti, setTriggerConfetti] = useState(false);
 
   useEffect(() => {
     loadSubscription();
@@ -78,8 +79,16 @@ export const SubscriptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
     if (!isElectron()) throw new Error('License activation only available in desktop app');
     
     const response = await window.electronAPI.subscription.activateLicense(key);
+    console.log('License activation response:', response); // Debug log
     if (response.success) {
       await loadSubscription();
+      
+      // Trigger confetti for PAID tier activation
+      console.log('Checking new_tier:', response.data?.new_tier); // Debug log
+      if (response.data?.new_tier === 'paid') {
+        console.log('Triggering confetti for PAID tier!'); // Debug log
+        setTriggerConfetti(true);
+      }
     } else {
       throw new Error(response.error || 'License activation failed');
     }
@@ -98,6 +107,10 @@ export const SubscriptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
     return Math.max(0, Math.ceil(diff / (1000 * 60 * 60 * 24)));
   }, [subscription]);
 
+  const resetConfetti = useCallback(() => {
+    setTriggerConfetti(false);
+  }, []);
+
   const value: SubscriptionContextValue = {
     subscription,
     usage,
@@ -107,7 +120,9 @@ export const SubscriptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
     getRemainingQuota,
     activateLicense,
     getDaysRemaining,
-    refreshSubscription
+    refreshSubscription,
+    triggerConfetti,
+    resetConfetti
   };
 
   return (

@@ -4,6 +4,7 @@
  */
 
 import type { ServiceStatus } from './services';
+import type { SubscriptionSettings, UsageStats } from './subscription';
 
 export type ApiKeyMode = 'default' | 'custom';
 export type SearchMode = 'naive' | 'local' | 'global' | 'hybrid';
@@ -106,10 +107,15 @@ export interface SettingsContextValue {
   isLoading: boolean;
   error: SettingsError | null;
   serviceStatus: ServiceStatus | null;
+  subscriptionStatus: {
+    subscription: SubscriptionSettings | null;
+    usage: UsageStats | null;
+  } | null;
   updateSettings: (updates: Partial<UserSettings>) => Promise<void>;
   resetSettings: () => Promise<void>;
   validateApiKeys: () => Promise<boolean>;
   applySettings: () => Promise<void>;
   fetchServiceStatus: () => Promise<void>;
+  fetchSubscriptionStatus: () => Promise<void>;
   clearError: () => void;
 }

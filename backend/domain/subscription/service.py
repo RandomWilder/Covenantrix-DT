@@ -113,6 +113,15 @@ class SubscriptionService:
             # Handle tier transition
             await self.transition_tier(new_tier, reason=f"license_activated_from_{old_tier}")
             
+            # Create upgrade notification for PAID tier activation
+            if new_tier == "paid":
+                await self.notification_service.create_notification(
+                    type="success",
+                    source="subscription",
+                    title="Welcome to Paid Tier!",
+                    summary="You now have unlimited documents, unlimited queries, and access to default API keys. Enjoy your premium experience!"
+                )
+            
             logger.info(f"License activated successfully: {old_tier} -> {new_tier}")
             return new_subscription
             
@@ -190,7 +199,18 @@ class SubscriptionService:
         
         # Update tier and features
         settings.subscription.tier = new_tier
-        settings.subscription.features = FeatureFlags(**get_tier_features(new_tier))
+        
+        # Use JWT features if available, otherwise use hardcoded tier features
+        jwt_features = None
+        if settings.subscription.license_key:
+            try:
+                # Extract JWT features from stored license key
+                payload = self.license_validator.validate_jwt(settings.subscription.license_key)
+                jwt_features = payload.get("features")
+            except Exception as e:
+                logger.warning(f"Failed to extract JWT features during tier transition: {e}")
+        
+        settings.subscription.features = FeatureFlags(**get_tier_features(new_tier, jwt_features))
         settings.subscription.last_tier_change = datetime.utcnow().isoformat()
         
         # Handle specific transitions
@@ -409,5 +429,70 @@ class SubscriptionService:
             "daily_remaining": remaining["daily_remaining"],
             "monthly_reset_date": remaining["reset_dates"]["monthly"],
             "daily_reset_date": remaining["reset_dates"]["daily"]
+        }
+    
+    async def get_tier_status(self) -> Dict[str, Any]:
+        """
+        Get comprehensive tier status including warnings and upgrade prompts
+        
+        Returns:
+            Dictionary with tier status, warnings, and upgrade information
+        """
+        subscription = await self.get_current_subscription_async()
+        usage_stats = await self.get_usage_stats()
+        remaining = await self.get_remaining_queries()
+        
+        # Calculate usage percentages
+        monthly_usage_pct = 0
+        daily_usage_pct = 0
+        doc_usage_pct = 0
+        
+        if subscription.features.max_queries_monthly > 0:
+            monthly_usage_pct = (usage_stats["queries_this_month"] / subscription.features.max_queries_monthly) * 100
+        
+        if subscription.features.max_queries_daily > 0:
+            daily_usage_pct = (usage_stats["queries_today"] / subscription.features.max_queries_daily) * 100
+        
+        if subscription.features.max_documents > 0:
+            doc_usage_pct = (usage_stats["documents_uploaded"] / subscription.features.max_documents) * 100
+        
+        # Generate warnings
+        warnings = []
+        if monthly_usage_pct >= 90:
+            warnings.append(f"Monthly query limit nearly reached ({monthly_usage_pct:.0f}%)")
+        if daily_usage_pct >= 90:
+            warnings.append(f"Daily query limit nearly reached ({daily_usage_pct:.0f}%)")
+        if doc_usage_pct >= 90:
+            warnings.append(f"Document limit nearly reached ({doc_usage_pct:.0f}%)")
+        
+        # Generate upgrade prompts
+        upgrade_prompts = []
+        if subscription.tier in ["free", "trial"] and (monthly_usage_pct >= 80 or daily_usage_pct >= 80):
+            upgrade_prompts.append("Upgrade to paid tier for unlimited queries")
+        if subscription.tier == "free" and doc_usage_pct >= 80:
+            upgrade_prompts.append("Upgrade to paid tier for unlimited documents")
+        
+        return {
+            "tier": subscription.tier,
+            "features": subscription.features.model_dump(),
+            "usage_stats": usage_stats,
+            "remaining": remaining,
+            "usage_percentages": {
+                "monthly_queries": monthly_usage_pct,
+                "daily_queries": daily_usage_pct,
+                "documents": doc_usage_pct
+            },
+            "warnings": warnings,
+            "upgrade_prompts": upgrade_prompts,
+            "trial_info": {
+                "started_at": subscription.trial_started_at,
+                "expires_at": subscription.trial_expires_at,
+                "is_active": subscription.tier == "trial"
+            },
+            "grace_period_info": {
+                "started_at": subscription.grace_period_started_at,
+                "expires_at": subscription.grace_period_expires_at,
+                "is_active": subscription.tier == "paid_limited"
+            }
         }
 

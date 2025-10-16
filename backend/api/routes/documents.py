@@ -17,7 +17,7 @@ from domain.documents.service import DocumentService
 from domain.documents.models import Document
 from infrastructure.ai.document_processor import DocumentProcessor
 from infrastructure.storage.file_storage import FileStorage
-from core.dependencies import get_document_service, get_ocr_service, get_subscription_service
+from core.dependencies import get_document_service, get_subscription_aware_document_service, get_ocr_service, get_subscription_service
 from api.schemas.documents import (
     DocumentResponse, DocumentListResponse, DocumentUploadResponse,
     BatchUploadResponse, BatchUploadItem, GoogleDriveFileRequest,
@@ -32,8 +32,9 @@ logger = logging.getLogger(__name__)
 @router.post("/upload", response_model=DocumentUploadResponse)
 async def upload_document(
     file: UploadFile = File(...),
-    service: DocumentService = Depends(get_document_service),
-    ocr_service: Optional[OCRService] = Depends(get_ocr_service)
+    service: DocumentService = Depends(get_subscription_aware_document_service),
+    ocr_service: Optional[OCRService] = Depends(get_ocr_service),
+    subscription_service = Depends(get_subscription_service)
 ) -> DocumentUploadResponse:
     """
     Upload a document for processing
@@ -45,6 +46,18 @@ async def upload_document(
     Returns:
         Upload confirmation with document ID
     """
+    # Check subscription upload limits
+    try:
+        allowed, reason = await subscription_service.check_upload_allowed()
+        if not allowed:
+            raise HTTPException(
+                status_code=403,
+                detail=f"Upload limit exceeded: {reason}"
+            )
+    except Exception as e:
+        logger.error(f"Subscription check failed: {e}")
+        # Continue if subscription service is unavailable
+    
     # Pre-operation global state check (DO NOT re-resolve keys)
     from core.dependencies import get_rag_engine
     if get_rag_engine() is None:

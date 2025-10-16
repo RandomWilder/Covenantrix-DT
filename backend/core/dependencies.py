@@ -453,3 +453,42 @@ def get_subscription_service() -> 'SubscriptionService':
         )
     
     return _subscription_service
+
+
+def subscription_service_available() -> bool:
+    """
+    Check if subscription service is available (non-blocking check)
+    
+    Returns:
+        bool: True if subscription service is initialized and available
+    """
+    global _subscription_service
+    return _subscription_service is not None
+
+
+def get_subscription_aware_document_service(
+    rag_engine: RAGEngine = Depends(get_rag_engine),
+    document_registry: DocumentRegistry = Depends(get_document_registry),
+    ocr_service: Optional[OCRService] = Depends(get_ocr_service),
+    subscription_service: 'SubscriptionService' = Depends(get_subscription_service),
+    settings: Settings = Depends(get_config)
+) -> DocumentService:
+    """
+    Get subscription-aware document service instance
+    
+    This service enforces subscription limits before processing documents
+    """
+    # Get current subscription limits
+    subscription = subscription_service.get_current_subscription()
+    
+    # Use subscription-based file size limit if available
+    max_file_size_mb = settings.storage.max_file_size_mb
+    if subscription.features.max_doc_size_mb > 0:
+        max_file_size_mb = min(max_file_size_mb, subscription.features.max_doc_size_mb)
+    
+    return DocumentService(
+        rag_engine=rag_engine,
+        document_registry=document_registry,
+        max_file_size_mb=max_file_size_mb,
+        ocr_service=ocr_service
+    )

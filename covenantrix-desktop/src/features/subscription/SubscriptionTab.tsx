@@ -3,19 +3,38 @@
  * Shows subscription status and license activation
  */
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useSubscription } from '../../contexts/SubscriptionContext';
 import { useTranslation } from 'react-i18next';
-import { AlertCircle, CheckCircle, Clock, Key } from 'lucide-react';
+import { AlertCircle, CheckCircle, Clock, Key, TrendingUp, AlertTriangle } from 'lucide-react';
+import { ConfettiEffect } from '../../components/ui/ConfettiEffect';
+import type { TierStatus } from '../../types/subscription';
 
 export const SubscriptionTab: React.FC = () => {
-  const { subscription, usage, activateLicense } = useSubscription();
+  const { subscription, usage, activateLicense, triggerConfetti, resetConfetti } = useSubscription();
   const { t } = useTranslation();
   const [licenseKey, setLicenseKey] = useState('');
   const [isActivating, setIsActivating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  const [tierStatus, setTierStatus] = useState<TierStatus | null>(null);
   
+  // Load tier status on mount
+  useEffect(() => {
+    loadTierStatus();
+  }, []);
+
+  const loadTierStatus = async () => {
+    try {
+      const response = await (window.electronAPI.subscription as any).getTierStatus();
+      if (response.success && response.data) {
+        setTierStatus(response.data);
+      }
+    } catch (error) {
+      console.error('Failed to load tier status:', error);
+    }
+  };
+
   if (!subscription || !usage) {
     return (
       <div className="p-6 text-center text-gray-500 dark:text-gray-400">
@@ -59,6 +78,58 @@ export const SubscriptionTab: React.FC = () => {
   
   return (
     <div className="space-y-6 p-6">
+      {/* Confetti Effect */}
+      <ConfettiEffect 
+        trigger={triggerConfetti} 
+        onComplete={resetConfetti} 
+      />
+      {/* Warnings and Upgrade Prompts */}
+      {tierStatus && (tierStatus.warnings.length > 0 || tierStatus.upgrade_prompts.length > 0) && (
+        <div className="space-y-3">
+          {/* Warnings */}
+          {tierStatus.warnings.length > 0 && (
+            <div className="border border-yellow-200 dark:border-yellow-700 rounded-lg p-4 bg-yellow-50 dark:bg-yellow-900/20">
+              <div className="flex items-start gap-2">
+                <AlertTriangle className="w-5 h-5 text-yellow-600 flex-shrink-0 mt-0.5" />
+                <div>
+                  <h4 className="font-medium text-yellow-800 dark:text-yellow-200 mb-2">
+                    {t('subscription.warnings', 'Usage Warnings')}
+                  </h4>
+                  <ul className="space-y-1">
+                    {tierStatus.warnings.map((warning: string, index: number) => (
+                      <li key={index} className="text-sm text-yellow-700 dark:text-yellow-300">
+                        • {warning}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
+            </div>
+          )}
+          
+          {/* Upgrade Prompts */}
+          {tierStatus.upgrade_prompts.length > 0 && (
+            <div className="border border-blue-200 dark:border-blue-700 rounded-lg p-4 bg-blue-50 dark:bg-blue-900/20">
+              <div className="flex items-start gap-2">
+                <TrendingUp className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
+                <div>
+                  <h4 className="font-medium text-blue-800 dark:text-blue-200 mb-2">
+                    {t('subscription.upgrade_suggestions', 'Upgrade Suggestions')}
+                  </h4>
+                  <ul className="space-y-1">
+                    {tierStatus.upgrade_prompts.map((prompt: string, index: number) => (
+                      <li key={index} className="text-sm text-blue-700 dark:text-blue-300">
+                        • {prompt}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Current Tier Display */}
       <div className={`border rounded-lg p-6 bg-${tierColor}-50 dark:bg-${tierColor}-900/20 border-${tierColor}-200 dark:border-${tierColor}-700`}>
         <div className="flex items-center justify-between mb-4">

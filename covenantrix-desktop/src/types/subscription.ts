@@ -45,6 +45,30 @@ export interface LicenseActivationResponse {
   message: string;
 }
 
+export interface TierStatus {
+  tier: string;
+  features: Record<string, any>;
+  usage_stats: UsageStats;
+  remaining: Record<string, any>;
+  usage_percentages: {
+    monthly_queries: number;
+    daily_queries: number;
+    documents: number;
+  };
+  warnings: string[];
+  upgrade_prompts: string[];
+  trial_info: {
+    started_at?: string;
+    expires_at?: string;
+    is_active: boolean;
+  };
+  grace_period_info: {
+    started_at?: string;
+    expires_at?: string;
+    is_active: boolean;
+  };
+}
+
 export interface SubscriptionContextValue {
   subscription: SubscriptionSettings | null;
   usage: UsageStats | null;
@@ -55,4 +79,6 @@ export interface SubscriptionContextValue {
   activateLicense: (key: string) => Promise<void>;
   getDaysRemaining: (type: 'trial' | 'grace') => number | null;
   refreshSubscription: () => Promise<void>;
+  triggerConfetti: boolean;
+  resetConfetti: () => void;
 }

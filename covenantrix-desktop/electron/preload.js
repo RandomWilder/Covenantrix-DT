@@ -61,7 +61,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Subscription management
   subscription: {
     getStatus: () => ipcRenderer.invoke('subscription:getStatus'),
-    activateLicense: (key) => ipcRenderer.invoke('subscription:activateLicense', key)
+    activateLicense: (key) => ipcRenderer.invoke('subscription:activateLicense', key),
+    getTierStatus: () => ipcRenderer.invoke('subscription:getTierStatus')
   },
   
   // Update notification event listeners

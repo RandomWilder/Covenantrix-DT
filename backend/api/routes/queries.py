@@ -17,7 +17,8 @@ logger = logging.getLogger(__name__)
 @router.post("", response_model=QueryResponse)
 async def query_documents(
     request: QueryRequest,
-    service: DocumentService = Depends(get_document_service)
+    service: DocumentService = Depends(get_document_service),
+    subscription_service = Depends(get_subscription_service)
 ) -> QueryResponse:
     """
     Query documents using RAG
@@ -29,23 +30,17 @@ async def query_documents(
     Returns:
         Query response with answer
     """
-    # NEW: Check query limits
-    from core.dependencies import get_subscription_service
-    subscription_service = get_subscription_service()
-    
-    can_query, reason = await subscription_service.check_query_allowed()
-    if not can_query:
-        remaining = await subscription_service.get_remaining_queries()
-        raise HTTPException(
-            status_code=429,  # Too Many Requests
-            detail={
-                "error": "query_limit_reached",
-                "message": reason,
-                "remaining_monthly": remaining["monthly_remaining"],
-                "remaining_daily": remaining["daily_remaining"],
-                "reset_dates": remaining["reset_dates"]
-            }
-        )
+    # Check subscription query limits
+    try:
+        allowed, reason = await subscription_service.check_query_allowed()
+        if not allowed:
+            raise HTTPException(
+                status_code=403,
+                detail=f"Query limit exceeded: {reason}"
+            )
+    except Exception as e:
+        logger.error(f"Subscription check failed: {e}")
+        # Continue if subscription service is unavailable
     
     try:
         result = await service.query_documents(

@@ -6,6 +6,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { UserSettings, SettingsContextValue, SettingsError } from '../types/settings';
 import type { ServiceStatus } from '../types/services';
+import type { SubscriptionSettings, UsageStats } from '../types/subscription';
 import { isElectron, envLog, envWarn } from '../utils/environment';
 
 const SettingsContext = createContext<SettingsContextValue | undefined>(undefined);
@@ -19,6 +20,10 @@ export const SettingsProvider: React.FC<SettingsProviderProps> = ({ children }) 
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<SettingsError | null>(null);
   const [serviceStatus, setServiceStatus] = useState<ServiceStatus | null>(null);
+  const [subscriptionStatus, setSubscriptionStatus] = useState<{
+    subscription: SubscriptionSettings | null;
+    usage: UsageStats | null;
+  } | null>(null);
 
   // Load settings on mount
   useEffect(() => {
@@ -230,6 +235,27 @@ export const SettingsProvider: React.FC<SettingsProviderProps> = ({ children }) 
     }
   }, []);
 
+  const fetchSubscriptionStatus = useCallback(async () => {
+    if (!isElectron()) {
+      envWarn('fetchSubscriptionStatus: Not in Electron environment, skipping');
+      return;
+    }
+
+    try {
+      const response = await window.electronAPI.subscription.getStatus();
+      if (response.success && response.data) {
+        setSubscriptionStatus({
+          subscription: response.data.subscription,
+          usage: response.data.usage
+        });
+      } else {
+        console.error('Failed to fetch subscription status:', response.error);
+      }
+    } catch (error) {
+      console.error('Error fetching subscription status:', error);
+    }
+  }, []);
+
   const applySettings = useCallback(async () => {
     if (!settings) return;
     
@@ -265,25 +291,28 @@ export const SettingsProvider: React.FC<SettingsProviderProps> = ({ children }) 
     setError(null);
   }, []);
 
-  // Fetch service status on mount
+  // Fetch service status and subscription status on mount
   useEffect(() => {
     if (!isElectron()) {
       envLog('SettingsContext: Skipping service status fetch in browser mode');
       return;
     }
     fetchServiceStatus();
-  }, [fetchServiceStatus]);
+    fetchSubscriptionStatus();
+  }, [fetchServiceStatus, fetchSubscriptionStatus]);
 
   const value: SettingsContextValue = {
     settings,
     isLoading,
     error,
     serviceStatus,
+    subscriptionStatus,
     updateSettings,
     resetSettings,
     validateApiKeys,
     applySettings,
     fetchServiceStatus,
+    fetchSubscriptionStatus,
     clearError
   };
 

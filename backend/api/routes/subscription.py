@@ -66,6 +66,19 @@ class ValidateLicenseResponse(BaseModel):
     error: Optional[str] = None
 
 
+class TierStatusResponse(BaseModel):
+    """Tier status response with warnings and upgrade prompts"""
+    tier: str
+    features: Dict[str, Any]
+    usage_stats: Dict[str, Any]
+    remaining: Dict[str, Any]
+    usage_percentages: Dict[str, float]
+    warnings: list[str]
+    upgrade_prompts: list[str]
+    trial_info: Dict[str, Any]
+    grace_period_info: Dict[str, Any]
+
+
 @router.get("/status", response_model=SubscriptionStatusResponse)
 async def get_subscription_status(
     subscription_service: SubscriptionService = Depends(get_subscription_service)
@@ -154,6 +167,27 @@ async def get_usage_stats(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to retrieve usage statistics: {str(e)}"
+        )
+
+
+@router.get("/tier-status", response_model=TierStatusResponse)
+async def get_tier_status(
+    subscription_service: SubscriptionService = Depends(get_subscription_service)
+):
+    """
+    Get comprehensive tier status with warnings and upgrade prompts
+    
+    Returns tier information, usage statistics, warnings, and upgrade recommendations
+    """
+    try:
+        status = await subscription_service.get_tier_status()
+        return TierStatusResponse(**status)
+        
+    except Exception as e:
+        logger.error(f"Failed to get tier status: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to retrieve tier status: {str(e)}"
         )
 
 

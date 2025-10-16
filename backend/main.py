@@ -51,6 +51,7 @@ from core.logging_config import setup_logging
 from core.dependencies import set_rag_engine, set_ocr_service, set_subscription_service
 from api.middleware.error_handler import add_exception_handlers
 from api.middleware.logging import LoggingMiddleware
+from api.middleware.subscription_enforcement import add_subscription_enforcement_middleware
 
 # Import routers
 from api.routes import (
@@ -235,6 +236,9 @@ def create_application() -> FastAPI:
     
     # Custom middleware
     app.add_middleware(LoggingMiddleware)
+    
+    # Subscription enforcement middleware
+    add_subscription_enforcement_middleware(app)
     
     # Exception handlers
     add_exception_handlers(app)

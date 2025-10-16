@@ -869,6 +869,21 @@ function registerSubscriptionHandlers() {
     }
   });
 
+  // Get tier status with warnings and upgrade prompts
+  ipcMain.handle('subscription:getTierStatus', async () => {
+    try {
+      const backendUrl = global.backendUrl || 'http://localhost:8000';
+      const response = await axios.get(`${backendUrl}/api/subscription/tier-status`);
+      return { success: true, data: response.data };
+    } catch (error) {
+      console.error('Error getting tier status:', error.message);
+      return { 
+        success: false, 
+        error: error.response?.data?.detail || error.message 
+      };
+    }
+  });
+
   console.log('Subscription IPC handlers registered');
 }
 

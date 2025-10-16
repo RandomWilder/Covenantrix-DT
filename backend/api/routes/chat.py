@@ -10,7 +10,7 @@ import json
 
 from domain.chat.service import ChatService
 from domain.chat.exceptions import MessageProcessingError
-from core.dependencies import get_chat_service
+from core.dependencies import get_chat_service, get_subscription_service
 from api.schemas.chat import (
     ChatMessageRequest, ChatMessageResponse,
     ConversationResponse, ConversationListResponse,
@@ -25,7 +25,8 @@ logger = logging.getLogger(__name__)
 @router.post("/message", response_model=ChatMessageResponse)
 async def send_message(
     request: ChatMessageRequest,
-    service: ChatService = Depends(get_chat_service)
+    service: ChatService = Depends(get_chat_service),
+    subscription_service = Depends(get_subscription_service)
 ) -> ChatMessageResponse:
     """
     Send a message and get response
@@ -37,6 +38,18 @@ async def send_message(
     Returns:
         Chat response with assistant message and sources
     """
+    # Check subscription query limits
+    try:
+        allowed, reason = await subscription_service.check_query_allowed()
+        if not allowed:
+            raise HTTPException(
+                status_code=403,
+                detail=f"Query limit exceeded: {reason}"
+            )
+    except Exception as e:
+        logger.error(f"Subscription check failed: {e}")
+        # Continue if subscription service is unavailable
+    
     # Pre-operation global state check (DO NOT re-resolve keys)
     from core.dependencies import get_rag_engine
     if get_rag_engine() is None:
@@ -44,24 +57,6 @@ async def send_message(
         raise HTTPException(
             status_code=400,
             detail="No valid OpenAI API key configured. Please configure your API key in Settings to start chatting."
-        )
-    
-    # NEW: Check query limits
-    from core.dependencies import get_subscription_service
-    subscription_service = get_subscription_service()
-    
-    can_query, reason = await subscription_service.check_query_allowed()
-    if not can_query:
-        remaining = await subscription_service.get_remaining_queries()
-        raise HTTPException(
-            status_code=429,  # Too Many Requests
-            detail={
-                "error": "query_limit_reached",
-                "message": reason,
-                "remaining_monthly": remaining["monthly_remaining"],
-                "remaining_daily": remaining["daily_remaining"],
-                "reset_dates": remaining["reset_dates"]
-            }
         )
     
     try:

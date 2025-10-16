@@ -132,6 +132,11 @@ declare global {
           data?: any;
           error?: string;
         }>;
+        getTierStatus: () => Promise<{
+          success: boolean;
+          data?: any;
+          error?: string;
+        }>;
       };
       
       // Update notification event listeners
