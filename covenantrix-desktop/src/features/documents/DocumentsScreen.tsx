@@ -4,10 +4,11 @@
  */
 
 import React, { useState, useEffect } from 'react'
-import { FileText, Search, Filter, RefreshCw } from 'lucide-react'
+import { FileText, Search, Filter, RefreshCw, Trash2 } from 'lucide-react'
 import { DocumentInfo } from '../../types/document'
 import { DocumentsApi } from '../../services/api/DocumentsApi'
 import DocumentCard from './DocumentCard'
+import ConfirmationModal from '../../components/ui/ConfirmationModal'
 
 const DocumentsScreen: React.FC = () => {
   const [documents, setDocuments] = useState<DocumentInfo[]>([])
@@ -15,6 +16,8 @@ const DocumentsScreen: React.FC = () => {
   const [error, setError] = useState<string | null>(null)
   const [searchTerm, setSearchTerm] = useState('')
   const [filterType, setFilterType] = useState<string>('all')
+  const [showResetModal, setShowResetModal] = useState(false)
+  const [isResetting, setIsResetting] = useState(false)
 
   const documentsApi = new DocumentsApi()
 
@@ -42,6 +45,28 @@ const DocumentsScreen: React.FC = () => {
       setDocuments(documents.filter(doc => doc.document_id !== documentId))
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to delete document')
+    }
+  }
+
+  const handleResetStorage = async () => {
+    setIsResetting(true)
+    setError(null)
+
+    try {
+      const response = await documentsApi.resetStorage()
+      if (response.success) {
+        // Refresh the document list to show empty state
+        await loadDocuments()
+        setShowResetModal(false)
+        // You could add a toast notification here if you have a toast system
+        console.log('Storage reset successfully:', response.message)
+      } else {
+        setError(response.error || 'Failed to reset storage')
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to reset storage')
+    } finally {
+      setIsResetting(false)
     }
   }
 
@@ -101,13 +126,23 @@ const DocumentsScreen: React.FC = () => {
               {documents.length} document{documents.length !== 1 ? 's' : ''} uploaded
             </p>
           </div>
-          <button
-            onClick={loadDocuments}
-            className="inline-flex items-center px-3 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
-          >
-            <RefreshCw className="w-4 h-4 mr-2" />
-            Refresh
-          </button>
+          <div className="flex items-center space-x-2">
+            <button
+              onClick={loadDocuments}
+              className="inline-flex items-center px-3 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+            >
+              <RefreshCw className="w-4 h-4 mr-2" />
+              Refresh
+            </button>
+            <button
+              onClick={() => setShowResetModal(true)}
+              className="inline-flex items-center px-3 py-2 text-sm font-medium text-red-700 dark:text-red-300 bg-white dark:bg-gray-800 border border-red-300 dark:border-red-600 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
+              title="Reset all documents"
+            >
+              <Trash2 className="w-4 h-4 mr-2" />
+              Reset
+            </button>
+          </div>
         </div>
       </div>
 
@@ -182,6 +217,19 @@ const DocumentsScreen: React.FC = () => {
           </div>
         )}
       </div>
+
+      {/* Reset Confirmation Modal */}
+      <ConfirmationModal
+        isOpen={showResetModal}
+        onClose={() => setShowResetModal(false)}
+        onConfirm={handleResetStorage}
+        title="Reset Document Storage"
+        message="This will permanently delete all documents and their processing data. This action cannot be undone. Are you sure you want to continue?"
+        confirmText="Reset All Documents"
+        cancelText="Cancel"
+        isLoading={isResetting}
+        isDestructive={true}
+      />
     </div>
   )
 }

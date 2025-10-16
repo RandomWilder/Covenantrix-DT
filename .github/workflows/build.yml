@@ -97,20 +97,36 @@ jobs:
         run: |
           echo "Creating macOS Python distribution..."
           
-          # Use Python 3.11 specifically (installed by setup-python action)
-          python3.11 -m venv dist/python-dist || exit 1
-          source dist/python-dist/bin/activate
+          # Detect architecture
+          ARCH=$(uname -m)
+          if [ "$ARCH" = "arm64" ] || [ "$ARCH" = "aarch64" ]; then
+            PYTHON_ARCH="aarch64"
+          else
+            PYTHON_ARCH="x86_64"
+          fi
           
-          echo "Upgrading pip..."
-          pip install --upgrade pip setuptools wheel || exit 1
+          echo "Downloading Python standalone build for macOS (${PYTHON_ARCH})..."
+          curl -L -o python-macos.tar.gz "https://github.com/indygreg/python-build-standalone/releases/download/20231002/cpython-3.11.6+20231002-${PYTHON_ARCH}-apple-darwin-install_only.tar.gz" || exit 1
           
-          echo "Installing packages (preferring binary wheels)..."
-          pip install -r backend/requirements.txt --prefer-binary || exit 1
+          echo "Extracting Python..."
+          mkdir -p dist/python-dist
+          tar -xzf python-macos.tar.gz -C dist/python-dist --strip-components=1 || exit 1
+          
+          echo "Extracted contents:"
+          ls -la dist/python-dist/
+          
+          echo "Installing pip..."
+          curl -L https://bootstrap.pypa.io/get-pip.py -o get-pip.py || exit 1
+          dist/python-dist/bin/python3 get-pip.py || exit 1
+          
+          echo "Installing packages..."
+          dist/python-dist/bin/python3 -m pip install -r backend/requirements.txt || exit 1
           
           # Verify PyMuPDF installed correctly
-          python -c "import fitz; print(f'PyMuPDF version: {fitz.__version__}')" || exit 1
+          dist/python-dist/bin/python3 -c "import fitz; print(f'PyMuPDF version: {fitz.__version__}')" || exit 1
           
           ln -sf python3 dist/python-dist/bin/python
+          echo "Created python symlink"
           
           echo "macOS Python distribution created successfully"
       

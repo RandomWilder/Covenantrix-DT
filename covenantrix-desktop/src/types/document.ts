@@ -145,6 +145,7 @@ export enum DocumentType {
   export interface ResetStorageResponse {
     success: boolean;
     message: string;
+    details?: Record<string, any>;
     timestamp: string;
     error?: string;
   }

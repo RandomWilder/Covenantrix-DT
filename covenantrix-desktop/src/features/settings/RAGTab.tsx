@@ -147,13 +147,14 @@ const RAGTab: React.FC<RAGTabProps> = ({ settings, onChange }) => {
           onChange={(e) => handleModelChange(e.target.value as LLMModel)}
           className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
         >
-          <option value="gpt-5-pro-2025-10-06">GPT-5 Pro (Premium, Most Capable)</option>
-          <option value="gpt-5-2025-08-07">GPT-5 (Latest, High Performance)</option>
-          <option value="gpt-5-mini-2025-08-07">GPT-5 Mini (Balanced, Recommended)</option>
-          <option value="gpt-5-nano-2025-08-07">GPT-5 Nano (Fast, Cost-Effective, Default)</option>
-          <option value="gpt-4o">GPT-4o (Multimodal, Current Production)</option>
-          <option value="gpt-4o-mini">GPT-4o Mini (Fast, Efficient)</option>
-          <option value="gpt-4-turbo">GPT-4 Turbo (Stable, Enhanced)</option>
+          <option value="gpt-5-pro">GPT-5 Pro (Premium, Most Capable)</option>
+          <option value="gpt-5">GPT-5 (Latest, High Performance)</option>
+          <option value="gpt-5-mini">GPT-5 Mini (Balanced)</option>
+          <option value="gpt-5-nano">GPT-5 Nano (Fast, Cost-Effective)</option>
+          <option value="gpt-4o">GPT-4o (Recommended, Proven)</option>
+          <option value="gpt-4o-mini">GPT-4o Mini (Fastest, Default)</option>
+          <option value="gpt-4-turbo">GPT-4 Turbo (Stable)</option>
+          <option value="gpt-3.5-turbo">GPT-3.5 Turbo (Budget, Very Fast)</option>
         </select>
         <div className="text-xs text-gray-500 dark:text-gray-400">
           <p>Different models offer different trade-offs:</p>

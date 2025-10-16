@@ -147,7 +147,7 @@ class RAGEngine:
             messages.append({"role": "user", "content": prompt})
             
             # Get model from settings or use default
-            model = self.user_settings.get("rag", {}).get("llm_model", "gpt-5-nano-2025-08-07")
+            model = self.user_settings.get("rag", {}).get("llm_model", "gpt-4o-mini")
             
             # Call OpenAI with filtered parameters
             response = await client.chat.completions.create(
@@ -212,7 +212,7 @@ class RAGEngine:
             messages.append({"role": "user", "content": prompt})
             
             # Get model from settings or use default
-            model = self.user_settings.get("rag", {}).get("llm_model", "gpt-5-nano-2025-08-07")
+            model = self.user_settings.get("rag", {}).get("llm_model", "gpt-4o-mini")
             
             # Call OpenAI with streaming enabled
             response = await client.chat.completions.create(
@@ -565,7 +565,7 @@ class RAGEngine:
             self.use_reranking = rag_settings.get("use_reranking", True)
             
             # Store LLM model setting
-            self.llm_model = rag_settings.get("llm_model", "gpt-5-nano-2025-08-07")
+            self.llm_model = rag_settings.get("llm_model", "gpt-4o-mini")
             
             # Apply language settings
             language_settings = settings.get("language", {})
@@ -629,7 +629,7 @@ class RAGEngine:
             "search_mode": getattr(self, 'search_mode', 'hybrid'),
             "top_k": getattr(self, 'top_k', 5),
             "use_reranking": getattr(self, 'use_reranking', True),
-            "llm_model": getattr(self, 'llm_model', 'gpt-5-nano-2025-08-07'),
+            "llm_model": getattr(self, 'llm_model', 'gpt-4o-mini'),
             "preferred_language": getattr(self, 'preferred_language', 'en'),
             "agent_language": getattr(self, 'agent_language', 'auto')
         }

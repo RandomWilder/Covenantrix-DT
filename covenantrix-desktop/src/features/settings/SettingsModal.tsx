@@ -341,7 +341,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
                   )}
                   {activeTab === 'rag' && (
                     <RAGTab
-                      settings={localSettings.rag || { search_mode: 'hybrid', top_k: 5, use_reranking: true, enable_ocr: true, llm_model: 'gpt-5-nano-2025-08-07' }}
+                      settings={localSettings.rag || { search_mode: 'hybrid', top_k: 5, use_reranking: true, enable_ocr: true, llm_model: 'gpt-4o-mini' }}
                       onChange={(updates: any) => handleSettingsChange({ rag: updates })}
                     />
                   )}

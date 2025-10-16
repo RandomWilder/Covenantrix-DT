@@ -9,7 +9,8 @@ import {
   DocumentUploadResponse, 
   DocumentDeleteResponse,
   DocumentEntitiesResponse,
-  BatchProgressEvent
+  BatchProgressEvent,
+  ResetStorageResponse
 } from '../../types/document'
 
 export class DocumentsApi extends ApiService {
@@ -112,6 +113,14 @@ export class DocumentsApi extends ApiService {
    */
   async getDocumentEntities(documentId: string): Promise<DocumentEntitiesResponse> {
     const response = await this.get<DocumentEntitiesResponse>(`/documents/${documentId}/entities`)
+    return response.data
+  }
+
+  /**
+   * Reset all document storage
+   */
+  async resetStorage(): Promise<ResetStorageResponse> {
+    const response = await this.post<ResetStorageResponse>('/storage/reset?confirm=true')
     return response.data
   }
 }

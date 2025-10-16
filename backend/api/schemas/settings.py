@@ -24,16 +24,19 @@ class SearchMode(str, Enum):
 class LLMModel(str, Enum):
     """Available OpenAI models for RAG generation"""
     
-    # Premium (Latest)
-    GPT_5_PRO = "gpt-5-pro-2025-10-06"
-    GPT_5 = "gpt-5-2025-08-07"
-    GPT_5_MINI = "gpt-5-mini-2025-08-07"
-    GPT_5_NANO = "gpt-5-nano-2025-08-07"  # Default
+    # GPT-5 Series (Latest)
+    GPT_5_PRO = "gpt-5-pro"
+    GPT_5 = "gpt-5"
+    GPT_5_MINI = "gpt-5-mini"
+    GPT_5_NANO = "gpt-5-nano"
     
-    # Standard (Current Production)
+    # GPT-4 Series (Recommended, Production-Ready)
     GPT_4O = "gpt-4o"
-    GPT_4O_MINI = "gpt-4o-mini"
+    GPT_4O_MINI = "gpt-4o-mini"  # Recommended default
     GPT_4_TURBO = "gpt-4-turbo"
+    
+    # GPT-3.5 Series (Budget-Friendly)
+    GPT_3_5_TURBO = "gpt-3.5-turbo"
 
 
 class LanguageCode(str, Enum):
@@ -92,7 +95,25 @@ class RAGSettings(BaseModel):
     top_k: int = Field(default=5, ge=1, le=20, description="Number of top results to retrieve")
     use_reranking: bool = Field(default=True, description="Enable Cohere reranking")
     enable_ocr: bool = Field(default=True, description="Enable Google Vision OCR")
-    llm_model: LLMModel = Field(default=LLMModel.GPT_5_NANO, description="LLM model for RAG generation")
+    llm_model: LLMModel = Field(default=LLMModel.GPT_4O_MINI, description="LLM model for RAG generation")
+
+    @field_validator("llm_model", mode="before")
+    @classmethod
+    def migrate_old_model_names(cls, v):
+        """Migrate old dated model names to new base names"""
+        # Migration map for backward compatibility
+        migration_map = {
+            "gpt-5-pro-2025-10-06": "gpt-5-pro",
+            "gpt-5-2025-08-07": "gpt-5",
+            "gpt-5-mini-2025-08-07": "gpt-5-mini",
+            "gpt-5-nano-2025-08-07": "gpt-5-nano",
+        }
+        
+        # If it's an old model name, convert it
+        if isinstance(v, str) and v in migration_map:
+            return migration_map[v]
+        
+        return v
 
     @field_validator("use_reranking")
     @classmethod

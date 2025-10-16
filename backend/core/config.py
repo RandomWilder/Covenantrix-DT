@@ -112,7 +112,7 @@ class Settings(BaseSettings):
     # Google OAuth configuration
     google_oauth_client_id: Optional[str] = Field(default=None, validation_alias="GOOGLE_CLIENT_ID")
     google_oauth_client_secret: Optional[str] = Field(default=None, validation_alias="GOOGLE_CLIENT_SECRET")
-    google_oauth_redirect_uri: str = Field(default="http://localhost:8000/oauth/callback", validation_alias="GOOGLE_REDIRECT_URI")
+    google_oauth_redirect_uri: str = Field(default="http://localhost:8000/api/google/accounts/callback", validation_alias="GOOGLE_REDIRECT_URI")
     
     # External API configuration
     numbeo_api_key: Optional[str] = Field(None, env="NUMBEO_API_KEY")

@@ -12,13 +12,14 @@ export type Theme = 'light' | 'dark' | 'system';
 export type FontSize = 'small' | 'medium' | 'large';
 
 export type LLMModel = 
-  | 'gpt-5-pro-2025-10-06'
-  | 'gpt-5-2025-08-07'
-  | 'gpt-5-mini-2025-08-07'
-  | 'gpt-5-nano-2025-08-07'
+  | 'gpt-5-pro'
+  | 'gpt-5'
+  | 'gpt-5-mini'
+  | 'gpt-5-nano'
   | 'gpt-4o'
   | 'gpt-4o-mini'
-  | 'gpt-4-turbo';
+  | 'gpt-4-turbo'
+  | 'gpt-3.5-turbo';
 
 export interface ApiKeySettings {
   mode: ApiKeyMode;
