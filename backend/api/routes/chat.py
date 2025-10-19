@@ -112,7 +112,8 @@ async def send_message(
 @router.post("/message/stream")
 async def send_message_stream(
     request: ChatMessageRequest,
-    service: ChatService = Depends(get_chat_service)
+    service: ChatService = Depends(get_chat_service),
+    subscription_service = Depends(get_subscription_service)
 ):
     """
     Send a message and stream response
