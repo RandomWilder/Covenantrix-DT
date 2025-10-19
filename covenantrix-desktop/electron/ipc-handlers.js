@@ -884,6 +884,51 @@ function registerSubscriptionHandlers() {
     }
   });
 
+  // Get subscription analytics
+  ipcMain.handle('subscription:getAnalytics', async () => {
+    try {
+      const backendUrl = global.backendUrl || 'http://localhost:8000';
+      const response = await axios.get(`${backendUrl}/api/subscription/analytics`);
+      return { success: true, data: response.data };
+    } catch (error) {
+      console.error('Error getting analytics:', error.message);
+      return { 
+        success: false, 
+        error: error.response?.data?.detail || error.message 
+      };
+    }
+  });
+
+  // Get license history
+  ipcMain.handle('subscription:getLicenseHistory', async () => {
+    try {
+      const backendUrl = global.backendUrl || 'http://localhost:8000';
+      const response = await axios.get(`${backendUrl}/api/subscription/license-history`);
+      return { success: true, data: response.data };
+    } catch (error) {
+      console.error('Error getting license history:', error.message);
+      return { 
+        success: false, 
+        error: error.response?.data?.detail || error.message 
+      };
+    }
+  });
+
+  // Get upgrade recommendations
+  ipcMain.handle('subscription:getUpgradeRecommendations', async () => {
+    try {
+      const backendUrl = global.backendUrl || 'http://localhost:8000';
+      const response = await axios.get(`${backendUrl}/api/subscription/upgrade-recommendations`);
+      return { success: true, data: response.data };
+    } catch (error) {
+      console.error('Error getting upgrade recommendations:', error.message);
+      return { 
+        success: false, 
+        error: error.response?.data?.detail || error.message 
+      };
+    }
+  });
+
   console.log('Subscription IPC handlers registered');
 }
 

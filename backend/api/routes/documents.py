@@ -139,8 +139,14 @@ async def upload_document(
             processing_time=time.time() - start_time
         )
         
-        # NEW: Record document upload for usage tracking
-        await subscription_service.record_document_upload(document.id, file_size_mb)
+        # Enhanced document recording with tier and format context
+        file_extension = file.filename.split('.')[-1].lower() if '.' in file.filename else 'unknown'
+        await subscription_service.usage_tracker.record_document_upload(
+            doc_id=document.id,
+            size_mb=file_size_mb,
+            tier_at_upload=current_subscription.tier,
+            format=file_extension
+        )
         
         logger.info(f"Document uploaded and processed: {document.id}")
         
@@ -334,12 +340,17 @@ async def upload_documents_stream(
                         try:
                             event = await asyncio.wait_for(progress_queue.get(), timeout=0.1)
                             
+                            # Get actual message from registry (includes rotating messages)
+                            registry_data = await service.registry.get_document(document.id)
+                            processing_data = registry_data.get('processing', {}) if registry_data else {}
+                            actual_message = processing_data.get('message', service.STAGE_MESSAGES.get(event['stage'], "Processing..."))
+                            
                             # Create progress event from service callback
                             progress_event = DocumentProgressEvent(
                                 filename=filename,
                                 document_id=document.id,
                                 stage=DocumentProgressStage(event['stage']),
-                                message=service.STAGE_MESSAGES.get(event['stage'], "Processing..."),
+                                message=actual_message,
                                 progress_percent=event['percent'],
                                 timestamp=datetime.utcnow().isoformat()
                             )
@@ -357,18 +368,30 @@ async def upload_documents_stream(
                     # Wait for task completion and check for exceptions
                     await process_task
                     
-                    # NEW: Record document upload for usage tracking
-                    await subscription_service.record_document_upload(document.id, file_size_mb)
+                    # Enhanced document recording with tier and format context
+                    file_extension = filename.split('.')[-1].lower() if '.' in filename else 'unknown'
+                    await subscription_service.usage_tracker.record_document_upload(
+                        doc_id=document.id,
+                        size_mb=file_size_mb,
+                        tier_at_upload=current_subscription.tier,
+                        format=file_extension
+                    )
                     
                     # Drain remaining events from queue
                     while not progress_queue.empty():
                         try:
                             event = progress_queue.get_nowait()
+                            
+                            # Get actual message from registry (includes rotating messages)
+                            registry_data = await service.registry.get_document(document.id)
+                            processing_data = registry_data.get('processing', {}) if registry_data else {}
+                            actual_message = processing_data.get('message', service.STAGE_MESSAGES.get(event['stage'], "Processing..."))
+                            
                             progress_event = DocumentProgressEvent(
                                 filename=filename,
                                 document_id=document.id,
                                 stage=DocumentProgressStage(event['stage']),
-                                message=service.STAGE_MESSAGES.get(event['stage'], "Processing..."),
+                                message=actual_message,
                                 progress_percent=event['percent'],
                                 timestamp=datetime.utcnow().isoformat()
                             )

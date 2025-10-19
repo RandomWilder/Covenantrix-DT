@@ -74,6 +74,10 @@ class Document:
     # Content (not always loaded)
     content: Optional[str] = None
     
+    # Current processing stage and message (for documents being processed)
+    processing_stage: Optional[str] = None
+    processing_message: Optional[str] = None
+    
     @classmethod
     def create_new(
         cls,
@@ -142,7 +146,7 @@ class Document:
     
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary"""
-        return {
+        result = {
             "document_id": self.id,
             "filename": self.metadata.filename,
             "file_size_mb": self.metadata.file_size_mb,
@@ -153,6 +157,15 @@ class Document:
             "processed_at": self.updated_at.isoformat() if self.status == DocumentStatus.PROCESSED else None,
             "ocr_applied": self.processing_result.ocr_applied if self.processing_result else False
         }
+        
+        # Include processing stage and message if document is currently processing
+        if hasattr(self, 'processing_stage') and hasattr(self, 'processing_message'):
+            result["processing"] = {
+                "stage": self.processing_stage,
+                "message": self.processing_message
+            }
+        
+        return result
 
 
 @dataclass

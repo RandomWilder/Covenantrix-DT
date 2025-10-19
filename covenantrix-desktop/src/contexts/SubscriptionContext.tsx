@@ -4,7 +4,7 @@
  */
 
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import { SubscriptionSettings, UsageStats, SubscriptionContextValue } from '../types/subscription';
+import { SubscriptionSettings, UsageStats, SubscriptionContextValue, SubscriptionAnalytics, TierHistoryEntry } from '../types/subscription';
 import { isElectron } from '../utils/environment';
 
 const SubscriptionContext = createContext<SubscriptionContextValue | undefined>(undefined);
@@ -111,6 +111,36 @@ export const SubscriptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
     setTriggerConfetti(false);
   }, []);
 
+  const getAnalytics = useCallback(async (): Promise<SubscriptionAnalytics> => {
+    if (!isElectron()) throw new Error('Analytics only available in desktop app');
+    
+    const response = await (window.electronAPI.subscription as any).getAnalytics();
+    if (!response.success) {
+      throw new Error(response.error || 'Failed to get analytics');
+    }
+    return response.data;
+  }, []);
+
+  const getLicenseHistory = useCallback(async (): Promise<TierHistoryEntry[]> => {
+    if (!isElectron()) throw new Error('License history only available in desktop app');
+    
+    const response = await (window.electronAPI.subscription as any).getLicenseHistory();
+    if (!response.success) {
+      throw new Error(response.error || 'Failed to get license history');
+    }
+    return response.data;
+  }, []);
+
+  const getUpgradeRecommendations = useCallback(async (): Promise<string[]> => {
+    if (!isElectron()) throw new Error('Upgrade recommendations only available in desktop app');
+    
+    const response = await (window.electronAPI.subscription as any).getUpgradeRecommendations();
+    if (!response.success) {
+      throw new Error(response.error || 'Failed to get upgrade recommendations');
+    }
+    return response.data;
+  }, []);
+
   const value: SubscriptionContextValue = {
     subscription,
     usage,
@@ -122,7 +152,10 @@ export const SubscriptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
     getDaysRemaining,
     refreshSubscription,
     triggerConfetti,
-    resetConfetti
+    resetConfetti,
+    getAnalytics,
+    getLicenseHistory,
+    getUpgradeRecommendations
   };
 
   return (

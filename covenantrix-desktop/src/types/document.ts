@@ -116,6 +116,10 @@ export enum DocumentType {
     legal_entity_count?: number;
     key_insights?: string[];
     metadata_summary?: Record<string, any>;
+    processing?: {
+      stage?: string;
+      message?: string;
+    };
   }
   
   export interface DocumentListResponse {

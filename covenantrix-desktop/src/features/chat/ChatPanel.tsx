@@ -20,7 +20,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ width, disabled = false })
     selectedDocuments
   } = useChat()
   
-  const { subscription, canSendQuery, getRemainingQuota } = useSubscription()
+  const { subscription, canSendQuery, getRemainingQuota, refreshSubscription } = useSubscription()
   const { showUpgradeModal } = useUpgradeModal()
   
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -51,6 +51,8 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ width, disabled = false })
 
     try {
       await sendMessage(message, selectedDocuments)
+      // Refresh subscription data after successful message send
+      await refreshSubscription()
     } catch (error) {
       console.error('Failed to send message:', error)
     } finally {

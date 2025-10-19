@@ -110,6 +110,15 @@ class SubscriptionService:
             settings.subscription = new_subscription
             await self.settings_storage.save_settings(settings)
             
+            # Record tier change in usage tracker
+            await self.usage_tracker.record_tier_change(
+                old_tier=old_tier,
+                new_tier=new_tier,
+                reason="license_activation",
+                license_key=jwt_token,
+                expiration_date=new_subscription.trial_expires_at
+            )
+            
             # Handle tier transition
             await self.transition_tier(new_tier, reason=f"license_activated_from_{old_tier}")
             
@@ -167,6 +176,12 @@ class SubscriptionService:
             expiry = datetime.fromisoformat(subscription.trial_expires_at)
             if now >= expiry:
                 logger.info("Trial period expired, transitioning to FREE tier")
+                # Record tier change before transition
+                await self.usage_tracker.record_tier_change(
+                    old_tier="trial",
+                    new_tier="free",
+                    reason="trial_expired"
+                )
                 await self.transition_tier("free", reason="trial_expired")
                 changed = True
         
@@ -175,6 +190,12 @@ class SubscriptionService:
             expiry = datetime.fromisoformat(subscription.grace_period_expires_at)
             if now >= expiry:
                 logger.warning("Grace period expired, transitioning to FREE tier")
+                # Record tier change before transition
+                await self.usage_tracker.record_tier_change(
+                    old_tier="paid_limited",
+                    new_tier="free",
+                    reason="grace_period_expired"
+                )
                 await self.transition_tier("free", reason="grace_period_expired")
                 changed = True
         
@@ -293,6 +314,15 @@ class SubscriptionService:
         doc_count = await self.usage_tracker.get_document_count()
         
         if doc_count >= max_documents:
+            # Record violation
+            await self.usage_tracker.record_violation(
+                violation_type="document_limit",
+                tier=subscription.tier,
+                limit=max_documents,
+                attempted=doc_count,
+                action_taken="blocked",
+                grace_used=False
+            )
             return False, f"Document limit of {max_documents} reached for {subscription.tier} tier"
         
         return True, ""
@@ -310,7 +340,54 @@ class SubscriptionService:
             "max_queries_daily": subscription.features.max_queries_daily
         }
         
-        return await self.usage_tracker.check_query_limit(tier_limits)
+        allowed, reason = await self.usage_tracker.check_query_limit(tier_limits)
+        
+        # Record violation if limit exceeded
+        if not allowed:
+            # Determine which limit was exceeded
+            if "monthly" in reason.lower():
+                violation_type = "monthly_query_limit"
+                limit = subscription.features.max_queries_monthly
+            else:
+                violation_type = "daily_query_limit"
+                limit = subscription.features.max_queries_daily
+            
+            # Get current usage to determine attempted amount
+            usage_data = await self.usage_tracker.get_usage_stats()
+            attempted = usage_data["queries"]["monthly"]["count"] if "monthly" in violation_type else usage_data["queries"]["daily"]["count"]
+            
+            # Check if grace period can be used
+            grace_data = await self.usage_tracker._load_data()
+            grace_remaining = grace_data["usage"]["enforcement"]["grace_periods"]["query_overage_remaining"]
+            
+            if grace_remaining > 0:
+                # Use grace period
+                await self.usage_tracker.record_violation(
+                    violation_type=violation_type,
+                    tier=subscription.tier,
+                    limit=limit,
+                    attempted=attempted,
+                    action_taken="grace_allowed",
+                    grace_used=True
+                )
+                # Decrement grace allowance
+                await self.usage_tracker.update_grace_periods(
+                    query_overage_remaining=grace_remaining - 1,
+                    last_grace_reset=grace_data["usage"]["enforcement"]["grace_periods"]["last_grace_reset"]
+                )
+                return True, ""  # Allow query with grace
+            else:
+                # Block query
+                await self.usage_tracker.record_violation(
+                    violation_type=violation_type,
+                    tier=subscription.tier,
+                    limit=limit,
+                    attempted=attempted,
+                    action_taken="blocked",
+                    grace_used=False
+                )
+        
+        return allowed, reason
     
     async def record_query(self) -> None:
         """Record a query execution"""
@@ -420,6 +497,12 @@ class SubscriptionService:
         usage_data = await self.usage_tracker.get_usage_stats()
         remaining = await self.get_remaining_queries()
         
+        # Log usage data for debugging
+        logger.info(f"Retrieved usage stats for tier {subscription.tier}: "
+                   f"queries_today={usage_data['queries']['daily']['count']}, "
+                   f"queries_this_month={usage_data['queries']['monthly']['count']}, "
+                   f"documents={usage_data['documents']['current_visible']}")
+        
         return {
             "tier": subscription.tier,
             "documents_uploaded": usage_data["documents"]["current_visible"],
@@ -429,6 +512,68 @@ class SubscriptionService:
             "daily_remaining": remaining["daily_remaining"],
             "monthly_reset_date": remaining["reset_dates"]["monthly"],
             "daily_reset_date": remaining["reset_dates"]["daily"]
+        }
+    
+    async def get_upgrade_recommendations(self) -> Dict[str, Any]:
+        """
+        Get personalized upgrade recommendations based on usage patterns
+        
+        Returns:
+            Dictionary with upgrade recommendations and signals
+        """
+        # Calculate upgrade signals
+        upgrade_signals = await self.usage_tracker.calculate_upgrade_signals()
+        
+        # Get violation history
+        violations = await self.usage_tracker.get_violation_history(days=30)
+        
+        # Get feature usage
+        feature_usage = await self.usage_tracker.get_feature_usage_stats()
+        
+        # Generate recommendations
+        recommendations = []
+        
+        # Check for limit hits
+        if upgrade_signals["limit_hits_last_30_days"] > 0:
+            recommendations.append({
+                "type": "limit_hits",
+                "priority": "high",
+                "message": f"You've hit limits {upgrade_signals['limit_hits_last_30_days']} times in the last 30 days",
+                "benefit": "Unlimited queries and documents"
+            })
+        
+        # Check for high usage
+        if upgrade_signals["avg_queries_per_day"] > 10:
+            recommendations.append({
+                "type": "high_usage",
+                "priority": "medium",
+                "message": f"You're averaging {upgrade_signals['avg_queries_per_day']:.1f} queries per day",
+                "benefit": "Unlimited access for power users"
+            })
+        
+        # Check for trending usage
+        if upgrade_signals["trending_up"]:
+            recommendations.append({
+                "type": "trending_up",
+                "priority": "medium",
+                "message": "Your usage is increasing",
+                "benefit": "Scale without limits"
+            })
+        
+        # Check for feature usage
+        if feature_usage.get("export_used") or feature_usage.get("api_access_used"):
+            recommendations.append({
+                "type": "feature_usage",
+                "priority": "low",
+                "message": "You're using advanced features",
+                "benefit": "Full access to all premium features"
+            })
+        
+        return {
+            "recommendations": recommendations,
+            "signals": upgrade_signals,
+            "violation_count": len(violations),
+            "feature_usage": feature_usage
         }
     
     async def get_tier_status(self) -> Dict[str, Any]:

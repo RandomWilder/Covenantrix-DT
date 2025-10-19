@@ -125,8 +125,8 @@ export const useUpload = () => {
               newMessage = 'Processing failed'
             } else if (backendDoc.status === 'processing') {
               newStatus = 'processing'
-              newStage = 'building_connections'
-              newMessage = 'Building knowledge connections...'
+              newStage = (backendDoc.processing?.stage as DocumentProgressStage) || 'building_connections'
+              newMessage = backendDoc.processing?.message || 'Building knowledge connections...'
             }
             
             return {

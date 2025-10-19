@@ -137,6 +137,21 @@ declare global {
           data?: any;
           error?: string;
         }>;
+        getAnalytics: () => Promise<{
+          success: boolean;
+          data?: any;
+          error?: string;
+        }>;
+        getLicenseHistory: () => Promise<{
+          success: boolean;
+          data?: any;
+          error?: string;
+        }>;
+        getUpgradeRecommendations: () => Promise<{
+          success: boolean;
+          data?: any;
+          error?: string;
+        }>;
       };
       
       // Update notification event listeners

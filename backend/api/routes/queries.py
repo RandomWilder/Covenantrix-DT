@@ -30,6 +30,9 @@ async def query_documents(
     Returns:
         Query response with answer
     """
+    # Get subscription for tier information
+    subscription = await subscription_service.get_current_subscription_async()
+    
     # Check subscription query limits
     try:
         allowed, reason = await subscription_service.check_query_allowed()
@@ -49,8 +52,21 @@ async def query_documents(
             document_ids=request.document_ids
         )
         
-        # NEW: Record query usage
-        await subscription_service.record_query()
+        # Record query without session tracking
+        logger.info(f"Recording semantic search query for tier {subscription.tier}")
+        await subscription_service.usage_tracker.record_query(
+            tier=subscription.tier,
+            query_type="semantic_search",
+            success=True,
+            tokens_used=None  # Could be extracted from result if available
+        )
+        logger.info(f"Semantic search query recorded successfully for tier {subscription.tier}")
+        
+        # Track advanced search feature usage for specific query modes
+        if request.mode and request.mode != "semantic":
+            await subscription_service.usage_tracker.record_feature_usage("advanced_search")
+        
+        # Session tracking removed
         
         return QueryResponse(
             success=True,

@@ -62,7 +62,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
   subscription: {
     getStatus: () => ipcRenderer.invoke('subscription:getStatus'),
     activateLicense: (key) => ipcRenderer.invoke('subscription:activateLicense', key),
-    getTierStatus: () => ipcRenderer.invoke('subscription:getTierStatus')
+    getTierStatus: () => ipcRenderer.invoke('subscription:getTierStatus'),
+    getAnalytics: () => ipcRenderer.invoke('subscription:getAnalytics'),
+    getLicenseHistory: () => ipcRenderer.invoke('subscription:getLicenseHistory'),
+    getUpgradeRecommendations: () => ipcRenderer.invoke('subscription:getUpgradeRecommendations')
   },
   
   // Update notification event listeners

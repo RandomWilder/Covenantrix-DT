@@ -69,6 +69,53 @@ export interface TierStatus {
   };
 }
 
+export interface TierHistoryEntry {
+  tier: SubscriptionTier;
+  start_date: string;
+  end_date: string | null;
+  reason: string;
+  license_key?: string;
+  expiration_date?: string;
+}
+
+export interface ViolationRecord {
+  timestamp: string;
+  type: string;
+  tier: string;
+  limit: number;
+  attempted: number;
+  action_taken: string;
+  grace_used: boolean;
+}
+
+export interface FeatureUsageStats {
+  advanced_search_used: boolean;
+  export_used: boolean;
+  api_access_used: boolean;
+  last_feature_audit: string;
+}
+
+export interface UpgradeSignals {
+  limit_hits_last_30_days: number;
+  avg_queries_per_day: number;
+  trending_up: boolean;
+}
+
+export interface SubscriptionAnalytics {
+  tier_history: TierHistoryEntry[];
+  violations: ViolationRecord[];
+  feature_usage: FeatureUsageStats;
+  upgrade_signals: UpgradeSignals;
+  conversations_last_30_days: number;
+  avg_queries_per_conversation: number;
+  
+  // Deprecated aliases for backward compatibility
+  /** @deprecated Use conversations_last_30_days instead */
+  sessions_last_30_days: number;
+  /** @deprecated Use avg_queries_per_conversation instead */
+  avg_queries_per_session: number;
+}
+
 export interface SubscriptionContextValue {
   subscription: SubscriptionSettings | null;
   usage: UsageStats | null;
@@ -81,4 +128,7 @@ export interface SubscriptionContextValue {
   refreshSubscription: () => Promise<void>;
   triggerConfetti: boolean;
   resetConfetti: () => void;
+  getAnalytics: () => Promise<SubscriptionAnalytics>;
+  getLicenseHistory: () => Promise<TierHistoryEntry[]>;
+  getUpgradeRecommendations: () => Promise<string[]>;
 }

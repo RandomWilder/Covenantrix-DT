@@ -38,6 +38,9 @@ async def send_message(
     Returns:
         Chat response with assistant message and sources
     """
+    # Get subscription for tier information
+    subscription = await subscription_service.get_current_subscription_async()
+    
     # Check subscription query limits
     try:
         allowed, reason = await subscription_service.check_query_allowed()
@@ -78,8 +81,15 @@ async def send_message(
                 "excerpt": source.excerpt
             })
         
-        # NEW: Record query usage
-        await subscription_service.record_query()
+        # Record query without session tracking
+        logger.info(f"Recording chat query for tier {subscription.tier}")
+        await subscription_service.usage_tracker.record_query(
+            tier=subscription.tier,
+            query_type="chat",
+            success=True,
+            tokens_used=None  # Could be extracted from response if available
+        )
+        logger.info(f"Chat query recorded successfully for tier {subscription.tier}")
         
         return ChatMessageResponse(
             success=True,
@@ -114,6 +124,9 @@ async def send_message_stream(
     Returns:
         Server-Sent Events stream with token-by-token response
     """
+    # Get subscription for tier information
+    subscription = await subscription_service.get_current_subscription_async()
+    
     # Pre-operation global state check (DO NOT re-resolve keys)
     from core.dependencies import get_rag_engine
     if get_rag_engine() is None:
@@ -123,10 +136,7 @@ async def send_message_stream(
             detail="No valid OpenAI API key configured. Please configure your API key in Settings to start chatting."
         )
     
-    # NEW: Check query limits
-    from core.dependencies import get_subscription_service
-    subscription_service = get_subscription_service()
-    
+    # Check query limits
     can_query, reason = await subscription_service.check_query_allowed()
     if not can_query:
         remaining = await subscription_service.get_remaining_queries()
@@ -154,8 +164,13 @@ async def send_message_stream(
                 data = json.dumps(chunk)
                 yield f"data: {data}\n\n"
             
-            # NEW: Record query usage after streaming completes
-            await subscription_service.record_query()
+            # Record query without session tracking
+            await subscription_service.usage_tracker.record_query(
+                tier=subscription.tier,
+                query_type="chat_stream",
+                success=True,
+                tokens_used=None
+            )
                 
         except MessageProcessingError as e:
             logger.error(f"Streaming message processing failed: {e}")

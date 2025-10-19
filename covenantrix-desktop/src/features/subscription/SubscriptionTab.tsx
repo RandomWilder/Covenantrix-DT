@@ -6,22 +6,48 @@
 import React, { useState, useEffect } from 'react';
 import { useSubscription } from '../../contexts/SubscriptionContext';
 import { useTranslation } from 'react-i18next';
-import { AlertCircle, CheckCircle, Clock, Key, TrendingUp, AlertTriangle } from 'lucide-react';
+import { AlertCircle, CheckCircle, Clock, Key, TrendingUp, AlertTriangle, BarChart3, History, ChevronDown, ChevronUp } from 'lucide-react';
 import { ConfettiEffect } from '../../components/ui/ConfettiEffect';
-import type { TierStatus } from '../../types/subscription';
+import { AnalyticsDashboard } from './AnalyticsDashboard';
+import type { TierStatus, TierHistoryEntry } from '../../types/subscription';
 
 export const SubscriptionTab: React.FC = () => {
-  const { subscription, usage, activateLicense, triggerConfetti, resetConfetti } = useSubscription();
+  const { subscription, usage, activateLicense, triggerConfetti, resetConfetti, getLicenseHistory, getUpgradeRecommendations, refreshSubscription } = useSubscription();
   const { t } = useTranslation();
   const [licenseKey, setLicenseKey] = useState('');
   const [isActivating, setIsActivating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [tierStatus, setTierStatus] = useState<TierStatus | null>(null);
+  const [showAnalytics, setShowAnalytics] = useState(false);
+  const [showTierHistory, setShowTierHistory] = useState(false);
+  const [tierHistory, setTierHistory] = useState<TierHistoryEntry[]>([]);
+  const [upgradeRecommendations, setUpgradeRecommendations] = useState<string[]>([]);
+  const [isLoadingAnalytics, setIsLoadingAnalytics] = useState(false);
   
   // Load tier status on mount
   useEffect(() => {
     loadTierStatus();
+    // Refresh subscription data on mount to ensure fresh data
+    refreshSubscription();
+  }, [refreshSubscription]);
+
+  // Add data refresh on component mount and debug logging
+  useEffect(() => {
+    console.log('Usage data:', usage);
+    console.log('Daily queries:', usage?.queries_today);
+  }, [usage]);
+
+  // Refresh data when tab becomes visible
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (!document.hidden) {
+        loadAnalyticsData();
+      }
+    };
+    
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
   }, []);
 
   const loadTierStatus = async () => {
@@ -32,6 +58,36 @@ export const SubscriptionTab: React.FC = () => {
       }
     } catch (error) {
       console.error('Failed to load tier status:', error);
+    }
+  };
+
+  const loadAnalyticsData = async () => {
+    try {
+      setIsLoadingAnalytics(true);
+      const [history, recommendations] = await Promise.all([
+        getLicenseHistory(),
+        getUpgradeRecommendations()
+      ]);
+      setTierHistory(history);
+      setUpgradeRecommendations(recommendations);
+    } catch (error) {
+      console.error('Failed to load analytics data:', error);
+    } finally {
+      setIsLoadingAnalytics(false);
+    }
+  };
+
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString();
+  };
+
+  const getTierColorForHistory = (tier: string) => {
+    switch (tier) {
+      case 'trial': return 'text-blue-600 bg-blue-100';
+      case 'free': return 'text-gray-600 bg-gray-100';
+      case 'paid': return 'text-green-600 bg-green-100';
+      case 'paid_limited': return 'text-red-600 bg-red-100';
+      default: return 'text-gray-600 bg-gray-100';
     }
   };
 
@@ -248,6 +304,114 @@ export const SubscriptionTab: React.FC = () => {
         </div>
       )}
       
+      {/* Analytics Dashboard Toggle */}
+      <div className="border rounded-lg p-6 bg-white dark:bg-gray-800">
+        <button
+          onClick={() => {
+            setShowAnalytics(!showAnalytics);
+            if (!showAnalytics) {
+              loadAnalyticsData();
+            }
+          }}
+          className="flex items-center justify-between w-full text-left"
+        >
+          <div className="flex items-center gap-2">
+            <BarChart3 className="w-5 h-5 text-blue-600" />
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+              {t('subscription.analytics', 'Analytics Dashboard')}
+            </h3>
+          </div>
+          {showAnalytics ? <ChevronUp className="w-5 h-5 text-gray-500" /> : <ChevronDown className="w-5 h-5 text-gray-500" />}
+        </button>
+        
+        {showAnalytics && (
+          <div className="mt-4">
+            <AnalyticsDashboard />
+          </div>
+        )}
+      </div>
+
+      {/* Tier History */}
+      <div className="border rounded-lg p-6 bg-white dark:bg-gray-800">
+        <button
+          onClick={() => {
+            setShowTierHistory(!showTierHistory);
+            if (!showTierHistory && tierHistory.length === 0) {
+              loadAnalyticsData();
+            }
+          }}
+          className="flex items-center justify-between w-full text-left"
+        >
+          <div className="flex items-center gap-2">
+            <History className="w-5 h-5 text-purple-600" />
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+              {t('subscription.tier_history', 'Tier History')}
+            </h3>
+          </div>
+          {showTierHistory ? <ChevronUp className="w-5 h-5 text-gray-500" /> : <ChevronDown className="w-5 h-5 text-gray-500" />}
+        </button>
+        
+        {showTierHistory && (
+          <div className="mt-4">
+            {isLoadingAnalytics ? (
+              <div className="text-center text-gray-500 dark:text-gray-400 py-4">
+                {t('common.loading', 'Loading...')}
+              </div>
+            ) : tierHistory.length > 0 ? (
+              <div className="space-y-3">
+                {tierHistory.map((entry, index) => (
+                  <div key={index} className="flex items-center gap-3 p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                    <div className={`px-2 py-1 rounded text-xs font-medium ${getTierColorForHistory(entry.tier)}`}>
+                      {entry.tier.toUpperCase()}
+                    </div>
+                    <div className="flex-1">
+                      <p className="text-sm text-gray-700 dark:text-gray-300">
+                        {entry.reason}
+                      </p>
+                      <p className="text-xs text-gray-500 dark:text-gray-400">
+                        {formatDate(entry.start_date)} - {entry.end_date ? formatDate(entry.end_date) : 'Current'}
+                      </p>
+                    </div>
+                    {entry.license_key && (
+                      <div className="text-xs text-gray-500 dark:text-gray-400">
+                        {entry.license_key.substring(0, 8)}...
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-gray-500 dark:text-gray-400 text-center py-4">
+                {t('subscription.no_tier_history', 'No tier history available')}
+              </p>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Upgrade Recommendations */}
+      {upgradeRecommendations.length > 0 && (
+        <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-6 border border-blue-200 dark:border-blue-700">
+          <div className="flex items-center gap-2 mb-4">
+            <TrendingUp className="w-5 h-5 text-blue-600" />
+            <h3 className="text-lg font-semibold text-blue-900 dark:text-blue-100">
+              {t('subscription.upgrade_recommendations', 'Upgrade Recommendations')}
+            </h3>
+          </div>
+          
+          <div className="space-y-2">
+            {upgradeRecommendations.map((recommendation, index) => (
+              <div key={index} className="flex items-start gap-2">
+                <div className="w-2 h-2 bg-blue-600 rounded-full mt-2 flex-shrink-0" />
+                <p className="text-sm text-blue-800 dark:text-blue-200">
+                  {recommendation}
+                </p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Tier Information */}
       <div className="border rounded-lg p-6 bg-gray-50 dark:bg-gray-800/50">
         <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-3">

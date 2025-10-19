@@ -57,6 +57,16 @@ class DocumentService:
         "failed": "Processing failed"
     }
     
+    # Rotating messages for 75% stage
+    ROTATING_MESSAGES = [
+        "Building knowledge connections...",
+        "Analyzing document relationships...", 
+        "Creating semantic links...",
+        "Processing document structure...",
+        "Establishing connections...",
+        "Building knowledge graph..."
+    ]
+    
     def __init__(
         self,
         rag_engine: 'RAGEngine',
@@ -232,8 +242,26 @@ class DocumentService:
                 message=self.STAGE_MESSAGES["building_connections"]
             )
             
-            # Insert into LightRAG (this is all LightRAG needs - just text!)
-            await self.rag_engine.insert(extracted_content)
+            # Start rotating messages task
+            import asyncio
+            rotation_task = None
+            try:
+                # Start rotating messages
+                rotation_task = asyncio.create_task(
+                    self._rotate_messages(document.id, progress_callback)
+                )
+                
+                # Insert into LightRAG (this is all LightRAG needs - just text!)
+                await self.rag_engine.insert(extracted_content)
+                
+            finally:
+                # Always cancel rotation task
+                if rotation_task and not rotation_task.done():
+                    rotation_task.cancel()
+                    try:
+                        await rotation_task
+                    except asyncio.CancelledError:
+                        pass  # Expected when task is cancelled
             
             # Stage 4: Finalizing (90%)
             if progress_callback:
@@ -379,6 +407,9 @@ class DocumentService:
         for doc_data in docs_data:
             # Extract processing result if available
             processing_result = None
+            processing_stage = None
+            processing_message = None
+            
             if "processing" in doc_data and doc_data["processing"]:
                 processing_data = doc_data["processing"]
                 processing_result = ProcessingResult(
@@ -388,6 +419,11 @@ class DocumentService:
                     processing_time_seconds=processing_data.get("processing_time", 0.0),
                     ocr_applied=processing_data.get("ocr_applied", False)
                 )
+                
+                # Extract current processing stage and message for processing documents
+                if doc_data["status"] == "processing":
+                    processing_stage = processing_data.get("stage")
+                    processing_message = processing_data.get("message")
             
             documents.append(Document(
                 id=doc_data["document_id"],
@@ -401,7 +437,9 @@ class DocumentService:
                 content_hash=doc_data["content_hash"],
                 created_at=datetime.fromisoformat(doc_data["created_at"]),
                 updated_at=datetime.fromisoformat(doc_data["updated_at"]),
-                processing_result=processing_result
+                processing_result=processing_result,
+                processing_stage=processing_stage,
+                processing_message=processing_message
             ))
         
         # NEW: Apply tier-based visibility filtering
@@ -504,6 +542,51 @@ class DocumentService:
     def _estimate_chunks(self, content: str, chunk_size: int = 1200) -> int:
         """Estimate number of chunks for content"""
         return max(1, len(content) // chunk_size)
+    
+    async def _rotate_messages(
+        self, 
+        document_id: str, 
+        progress_callback: Optional[Callable[[str, int], Awaitable[None]]]
+    ) -> None:
+        """
+        Rotate messages during the 75% processing stage
+        
+        Args:
+            document_id: Document being processed
+            progress_callback: Optional progress callback
+        """
+        import asyncio
+        
+        try:
+            message_index = 0
+            while True:
+                # Get current rotating message
+                message = self.ROTATING_MESSAGES[message_index % len(self.ROTATING_MESSAGES)]
+                
+                # Update registry with rotating message
+                await self.registry.update_processing_stage(
+                    document_id=document_id,
+                    stage="building_connections",
+                    progress_percent=75,
+                    message=message
+                )
+                
+                # Call progress callback if provided
+                if progress_callback:
+                    await progress_callback("building_connections", 75)
+                
+                # Wait 2-3 seconds before next rotation
+                await asyncio.sleep(2.5)
+                
+                # Move to next message
+                message_index += 1
+                
+        except asyncio.CancelledError:
+            # Task was cancelled - this is expected when rag_engine.insert() completes
+            logger.debug(f"Message rotation cancelled for document {document_id}")
+        except Exception as e:
+            # Log error but don't raise - rotation failure shouldn't affect main processing
+            logger.warning(f"Message rotation error for document {document_id}: {e}")
     
     async def upload_documents_batch(
         self,

@@ -79,6 +79,40 @@ class TierStatusResponse(BaseModel):
     grace_period_info: Dict[str, Any]
 
 
+class AnalyticsResponse(BaseModel):
+    """Analytics response with complete usage data"""
+    tier_history: list[Dict[str, Any]]
+    violations: list[Dict[str, Any]]
+    feature_usage: Dict[str, bool]
+    upgrade_signals: Dict[str, Any]
+    conversations_last_30_days: int
+    avg_queries_per_conversation: float
+    
+    # Deprecated aliases for backward compatibility
+    @property
+    def sessions_last_30_days(self) -> int:
+        """Deprecated: Use conversations_last_30_days instead"""
+        return self.conversations_last_30_days
+    
+    @property
+    def avg_queries_per_session(self) -> float:
+        """Deprecated: Use avg_queries_per_conversation instead"""
+        return self.avg_queries_per_conversation
+
+
+class LicenseHistoryResponse(BaseModel):
+    """License history response"""
+    tier_history: list[Dict[str, Any]]
+
+
+class UpgradeRecommendationsResponse(BaseModel):
+    """Upgrade recommendations response"""
+    recommendations: list[Dict[str, Any]]
+    signals: Dict[str, Any]
+    violation_count: int
+    feature_usage: Dict[str, bool]
+
+
 @router.get("/status", response_model=SubscriptionStatusResponse)
 async def get_subscription_status(
     subscription_service: SubscriptionService = Depends(get_subscription_service)
@@ -227,5 +261,88 @@ async def validate_license(
         return ValidateLicenseResponse(
             valid=False,
             error=f"Validation error: {str(e)}"
+        )
+
+
+@router.get("/analytics", response_model=AnalyticsResponse)
+async def get_subscription_analytics(
+    subscription_service: SubscriptionService = Depends(get_subscription_service)
+):
+    """
+    Get complete subscription analytics
+    
+    Returns comprehensive analytics data including tier history, violations, 
+    feature usage, upgrade signals, and conversation analytics
+    """
+    try:
+        analytics = await subscription_service.usage_tracker.get_complete_analytics()
+        
+        # Track API access feature usage
+        await subscription_service.usage_tracker.record_feature_usage("api_access")
+        
+        # Get conversation-based analytics using the new method
+        conversation_analytics = await subscription_service.usage_tracker.get_conversation_analytics(days=30)
+        
+        return AnalyticsResponse(
+            tier_history=analytics.get("tier_history", []),
+            violations=analytics.get("violations", []),
+            feature_usage=analytics.get("feature_usage", {}),
+            upgrade_signals=analytics.get("upgrade_signals", {}),
+            conversations_last_30_days=conversation_analytics.get("conversations_count", 0),
+            avg_queries_per_conversation=conversation_analytics.get("avg_queries_per_conversation", 0.0)
+        )
+        
+    except Exception as e:
+        logger.error(f"Failed to get analytics: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to retrieve analytics: {str(e)}"
+        )
+
+
+@router.get("/license-history", response_model=LicenseHistoryResponse)
+async def get_license_history(
+    subscription_service: SubscriptionService = Depends(get_subscription_service)
+):
+    """
+    Get complete license/tier history
+    
+    Returns chronological history of all tier transitions
+    """
+    try:
+        tier_history = await subscription_service.usage_tracker.get_license_history()
+        
+        # Track API access feature usage
+        await subscription_service.usage_tracker.record_feature_usage("api_access")
+        
+        return LicenseHistoryResponse(tier_history=tier_history)
+        
+    except Exception as e:
+        logger.error(f"Failed to get license history: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to retrieve license history: {str(e)}"
+        )
+
+
+@router.get("/upgrade-recommendations", response_model=UpgradeRecommendationsResponse)
+async def get_upgrade_recommendations(
+    subscription_service: SubscriptionService = Depends(get_subscription_service)
+):
+    """
+    Get personalized upgrade recommendations
+    
+    Returns upgrade recommendations based on usage patterns and signals
+    """
+    try:
+        recommendations = await subscription_service.get_upgrade_recommendations()
+        
+        return UpgradeRecommendationsResponse(**recommendations)
+        
+    except Exception as e:
+        logger.error(f"Failed to get upgrade recommendations: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to retrieve upgrade recommendations: {str(e)}"
         )
 
