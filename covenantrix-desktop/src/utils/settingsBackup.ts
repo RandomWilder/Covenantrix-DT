@@ -3,7 +3,8 @@
  * Handle settings export/import and backup functionality
  */
 
-import { UserSettings } from '../types/settings';
+import { UserSettings } from '../types/settings'
+import { createTimestamp } from './dateUtils';
 import { sanitizeSettingsForExport, validateAndNormalizeSettings } from './settings';
 
 export interface BackupMetadata {
@@ -27,7 +28,7 @@ export const createSettingsBackup = (
 ): SettingsBackup => {
   const metadata: BackupMetadata = {
     version: '1.0',
-    timestamp: new Date().toISOString(),
+    timestamp: createTimestamp(),
     appVersion: '1.0.0', // This should match package.json version
     description
   };
@@ -89,7 +90,7 @@ export const downloadSettingsFile = (
   
   const link = document.createElement('a');
   link.href = url;
-  link.download = filename || `covenantrix-settings-${new Date().toISOString().split('T')[0]}.json`;
+  link.download = filename || `covenantrix-settings-${createTimestamp().split('T')[0]}.json`;
   
   document.body.appendChild(link);
   link.click();

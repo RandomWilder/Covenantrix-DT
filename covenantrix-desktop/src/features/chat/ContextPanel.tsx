@@ -2,6 +2,7 @@ import React, { useState } from 'react'
 import { useChat } from '../../contexts/ChatContext'
 import { useDocuments } from '../../hooks/useDocuments'
 import { FileText, Eye, Search } from '../../components/icons'
+import { formatDate } from '../../utils/dateUtils'
 
 interface ContextPanelProps {
   width: number
@@ -152,7 +153,7 @@ export const ContextPanel: React.FC<ContextPanelProps> = ({ width, collapsed }) 
                       </div>
                       {document.uploaded_at && (
                         <div className="text-xs text-gray-400 dark:text-gray-500 mt-1">
-                          {new Date(document.uploaded_at).toLocaleDateString()}
+                          {formatDate(document.uploaded_at)}
                         </div>
                       )}
                     </div>

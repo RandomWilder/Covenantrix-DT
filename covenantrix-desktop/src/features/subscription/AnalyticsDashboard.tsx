@@ -6,6 +6,7 @@
 import React, { useState, useEffect } from 'react';
 import { useSubscription } from '../../contexts/SubscriptionContext';
 import { useTranslation } from 'react-i18next';
+import { formatDate, createTimestamp } from '../../utils/dateUtils';
 import { 
   BarChart3, 
   TrendingUp, 
@@ -46,7 +47,7 @@ export const AnalyticsDashboard: React.FC = () => {
               advanced_search_used: false,
               export_used: false,
               api_access_used: false,
-              last_feature_audit: new Date().toISOString()
+              last_feature_audit: createTimestamp()
             },
             upgrade_signals: {
               limit_hits_last_30_days: 0,
@@ -81,15 +82,6 @@ export const AnalyticsDashboard: React.FC = () => {
     }
   };
 
-  const formatDate = (dateString: string) => {
-    try {
-      if (!dateString) return 'N/A';
-      return new Date(dateString).toLocaleDateString();
-    } catch (error) {
-      console.error('Error formatting date:', error);
-      return 'Invalid Date';
-    }
-  };
 
   const getTierColor = (tier: string) => {
     if (!tier) return 'text-gray-600 bg-gray-100';

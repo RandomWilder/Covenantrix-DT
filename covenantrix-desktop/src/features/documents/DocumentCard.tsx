@@ -7,6 +7,7 @@ import React, { useState, useEffect } from 'react'
 import { DocumentInfo, DocumentEntitiesResponse } from '../../types/document'
 import { DocumentsApi } from '../../services/api/DocumentsApi'
 import EntitySummary from './EntitySummary'
+import { formatDate } from '../../utils/dateUtils'
 
 interface DocumentCardProps {
   document: DocumentInfo
@@ -64,10 +65,6 @@ const DocumentCard: React.FC<DocumentCardProps> = ({
     return `${sizeInMB.toFixed(1)} MB`
   }
 
-  const formatDate = (dateString: string | null): string => {
-    if (!dateString) return 'Not processed'
-    return new Date(dateString).toLocaleDateString()
-  }
 
 
   const getDocumentTypeColor = (type: string) => {

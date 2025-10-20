@@ -359,7 +359,7 @@ class UserSettingsStorage:
         """
         try:
             if backup_path is None:
-                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
                 backup_path = self.storage_path.parent / f"user_settings_backup_{timestamp}.json"
             
             # Copy current settings to backup

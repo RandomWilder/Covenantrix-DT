@@ -8,6 +8,7 @@ import { UserSettings, SettingsContextValue, SettingsError } from '../types/sett
 import type { ServiceStatus } from '../types/services';
 import type { SubscriptionSettings, UsageStats } from '../types/subscription';
 import { isElectron, envLog, envWarn } from '../utils/environment';
+import { createTimestamp } from '../utils/dateUtils';
 
 const SettingsContext = createContext<SettingsContextValue | undefined>(undefined);
 
@@ -89,7 +90,7 @@ export const SettingsProvider: React.FC<SettingsProviderProps> = ({ children }) 
         privacy: updates.privacy ? { ...settings?.privacy, ...updates.privacy } : settings?.privacy,
         profile: updates.profile ? { ...settings?.profile, ...updates.profile } : settings?.profile,
         google_accounts: updates.google_accounts || settings?.google_accounts || [],
-        last_updated: new Date().toISOString(),
+        last_updated: createTimestamp(),
         version: '1.0'
       } as UserSettings;
       setSettings(updatedSettings);
@@ -112,7 +113,7 @@ export const SettingsProvider: React.FC<SettingsProviderProps> = ({ children }) 
         privacy: updates.privacy ? { ...settings?.privacy, ...updates.privacy } : settings?.privacy,
         profile: updates.profile ? { ...settings?.profile, ...updates.profile } : settings?.profile,
         google_accounts: updates.google_accounts || settings?.google_accounts || [],
-        last_updated: new Date().toISOString(),
+        last_updated: createTimestamp(),
         version: '1.0'
       } as UserSettings;
 
@@ -368,7 +369,7 @@ function getDefaultSettings(): UserSettings {
     },
     google_accounts: [],
     version: '1.0',
-    last_updated: new Date().toISOString()
+    last_updated: createTimestamp()
   };
 }
 
@@ -415,6 +416,6 @@ function validateAndNormalizeSettings(settings: any): UserSettings {
     },
     google_accounts: Array.isArray(settings?.google_accounts) ? settings.google_accounts : [],
     version: settings?.version || defaults.version,
-    last_updated: settings?.last_updated || new Date().toISOString()
+    last_updated: settings?.last_updated || createTimestamp()
   };
 }

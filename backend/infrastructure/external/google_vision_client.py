@@ -111,7 +111,7 @@ class GoogleVisionClient:
         Returns:
             VisionAPIResponse with extracted text and metadata
         """
-        start_time = datetime.now()
+        start_time = datetime.utcnow()
         
         try:
             await self._ensure_session()
@@ -134,7 +134,7 @@ class GoogleVisionClient:
             result = self._parse_text_detection_response(response_data)
             
             # Calculate processing time
-            processing_time = (datetime.now() - start_time).total_seconds()
+            processing_time = (datetime.utcnow() - start_time).total_seconds()
             
             return VisionAPIResponse(
                 text=result["text"],
@@ -166,7 +166,7 @@ class GoogleVisionClient:
         Returns:
             VisionAPIResponse with extracted text and metadata
         """
-        start_time = datetime.now()
+        start_time = datetime.utcnow()
         
         try:
             await self._ensure_session()
@@ -189,7 +189,7 @@ class GoogleVisionClient:
             result = self._parse_document_text_detection_response(response_data)
             
             # Calculate processing time
-            processing_time = (datetime.now() - start_time).total_seconds()
+            processing_time = (datetime.utcnow() - start_time).total_seconds()
             
             return VisionAPIResponse(
                 text=result["text"],
@@ -222,7 +222,7 @@ class GoogleVisionClient:
         Returns:
             VisionAPIResponse with extracted text and metadata
         """
-        start_time = datetime.now()
+        start_time = datetime.utcnow()
         
         try:
             await self._ensure_session()
@@ -245,7 +245,7 @@ class GoogleVisionClient:
             result = self._parse_text_detection_response(response_data)
             
             # Calculate processing time
-            processing_time = (datetime.now() - start_time).total_seconds()
+            processing_time = (datetime.utcnow() - start_time).total_seconds()
             
             return VisionAPIResponse(
                 text=result["text"],
@@ -614,12 +614,12 @@ class GoogleVisionClient:
             test_image = b'\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01\x08\x02\x00\x00\x00\x90wS\xde'
             request_data = self._build_text_detection_request(test_image, None, 1)
             
-            start_time = datetime.now()
+            start_time = datetime.utcnow()
             response_data = await self._make_api_request(
                 self.TEXT_DETECTION_ENDPOINT,
                 request_data
             )
-            response_time = (datetime.now() - start_time).total_seconds()
+            response_time = (datetime.utcnow() - start_time).total_seconds()
             
             return {
                 "status": "healthy",

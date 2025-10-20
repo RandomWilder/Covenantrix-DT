@@ -48,7 +48,7 @@ class NotificationService:
             summary=summary,
             content=content,
             actions=actions or [],
-            timestamp=datetime.now(),
+            timestamp=datetime.utcnow(),
             read=False,
             dismissed=False,
             metadata=metadata,
@@ -97,7 +97,7 @@ class NotificationService:
     async def cleanup_expired(self, cutoff_date: Optional[datetime] = None) -> int:
         """Delete notifications older than cutoff date (default: 7 days ago)."""
         if cutoff_date is None:
-            cutoff_date = datetime.now() - timedelta(days=7)
+            cutoff_date = datetime.utcnow() - timedelta(days=7)
         
         deleted_count = await self.storage.delete_expired(cutoff_date)
         logger.info(f"Cleaned up {deleted_count} expired notifications")

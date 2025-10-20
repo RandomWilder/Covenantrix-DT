@@ -7,6 +7,7 @@ import React, { useState, useRef } from 'react';
 import { Download, Upload, FileText, AlertCircle, CheckCircle, X } from 'lucide-react';
 import { useSettings } from '../../hooks/useSettings';
 import { useToast } from '../../hooks/useToast';
+import { formatDateTime } from '../../utils/dateUtils';
 import { 
   downloadSettingsFile, 
   readSettingsFile, 
@@ -190,7 +191,7 @@ const SettingsBackup: React.FC<SettingsBackupProps> = ({ onImport }) => {
             <h3 className="font-medium text-gray-900 dark:text-white mb-3">Current Settings</h3>
             <div className="text-sm text-gray-600 dark:text-gray-400 space-y-1">
               <div>Version: {settings.version}</div>
-              <div>Last Updated: {new Date(settings.last_updated || '').toLocaleString()}</div>
+              <div>Last Updated: {formatDateTime(settings.last_updated || '')}</div>
               <div>API Mode: {settings.api_keys.mode}</div>
               <div>Language: {settings.language.preferred}</div>
               <div>Theme: {settings.ui.theme}</div>
@@ -229,7 +230,7 @@ const SettingsBackup: React.FC<SettingsBackupProps> = ({ onImport }) => {
                     </span>
                   </div>
                   <div className="text-sm text-gray-600 dark:text-gray-400">
-                    Created: {new Date(importPreview.metadata.timestamp).toLocaleString()}
+                    Created: {formatDateTime(importPreview.metadata.timestamp)}
                   </div>
                   {importPreview.metadata.description && (
                     <div className="text-sm text-gray-600 dark:text-gray-400">

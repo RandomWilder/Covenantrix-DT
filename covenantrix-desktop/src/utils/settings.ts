@@ -4,6 +4,7 @@
  */
 
 import { UserSettings, Language, Theme, FontSize } from '../types/settings';
+import { createTimestamp } from './dateUtils';
 
 /**
  * Default settings factory
@@ -44,7 +45,7 @@ export const getDefaultSettings = (): UserSettings => {
     },
     google_accounts: [],
     version: '1.0',
-    last_updated: new Date().toISOString()
+    last_updated: createTimestamp()
   };
 };
 

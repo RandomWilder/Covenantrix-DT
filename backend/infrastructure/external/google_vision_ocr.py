@@ -136,7 +136,7 @@ class GoogleVisionOCR:
         filename: str
     ) -> OCRResult:
         """Process PDF file by converting pages to images and sending to Google Vision API"""
-        start_time = datetime.now()
+        start_time = datetime.utcnow()
         self.logger.info(f"Converting PDF to images: {filename}")
         
         pdf_doc = None
@@ -201,7 +201,7 @@ class GoogleVisionOCR:
             avg_confidence = sum(all_confidences) / len(all_confidences) if all_confidences else 0.0
             
             # Calculate processing time
-            processing_time = (datetime.now() - start_time).total_seconds()
+            processing_time = (datetime.utcnow() - start_time).total_seconds()
             
             self.logger.info(f"PDF processing complete: {len(combined_text)} chars, {avg_confidence:.2f} confidence, {processing_time:.2f}s")
             

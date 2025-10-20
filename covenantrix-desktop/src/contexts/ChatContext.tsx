@@ -8,6 +8,7 @@ import {
   ConversationResponse
 } from '../types/chat'
 import { useToast } from '../hooks/useToast'
+import { createTimestamp } from '../utils/dateUtils'
 import { ChatApi } from '../services/api/ChatApi'
 
 const ChatContext = createContext<ChatContextValue | undefined>(undefined)
@@ -65,7 +66,7 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
 
     const userMessageId = `user-${Date.now()}`
     const assistantMessageId = `assistant-${Date.now()}`
-    const timestamp = new Date().toISOString()
+    const timestamp = createTimestamp()
     
     // Create user message
     const userMessage = {
@@ -149,7 +150,7 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
                   }
                   return msg
                 }),
-                updated_at: new Date().toISOString()
+                updated_at: createTimestamp()
               }
             })
           }
@@ -194,7 +195,7 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
                   role: 'assistant' as const,
                   content: accumulatedContent,
                   sources: finalSources,
-                  timestamp: new Date().toISOString(),
+                  timestamp: createTimestamp(),
                   isStreaming: false
                 }
               }

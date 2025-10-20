@@ -4,6 +4,7 @@ import remarkGfm from 'remark-gfm'
 import { Message as MessageType } from '../../types/chat'
 import { Bot, User, Loader2 } from '../../components/icons'
 import { detectTextDirection } from '../../utils/textDirection'
+import { formatTimestamp } from '../../utils/dateUtils'
 
 interface MessageProps {
   message: MessageType
@@ -14,16 +15,6 @@ export const Message: React.FC<MessageProps> = ({ message, isStreaming = false }
   // Detect text direction for the message content
   const textDirection = detectTextDirection(message.content)
   
-  const formatTime = (timestamp: string) => {
-    try {
-      return new Date(timestamp).toLocaleTimeString([], { 
-        hour: '2-digit', 
-        minute: '2-digit' 
-      })
-    } catch {
-      return ''
-    }
-  }
 
   return (
     <div
@@ -88,7 +79,7 @@ export const Message: React.FC<MessageProps> = ({ message, isStreaming = false }
         )}
         
         <div className="text-xs text-gray-400 dark:text-gray-500 mt-1">
-          {formatTime(message.timestamp)}
+          {formatTimestamp(message.timestamp)}
         </div>
       </div>
       

@@ -1,5 +1,6 @@
 import React from 'react'
 import { FileText, Image, File as FileIcon, Folder, Table, Presentation } from 'lucide-react'
+import { formatFileDate } from '../../../utils/dateUtils'
 
 export interface DriveFile {
   id: string
@@ -60,29 +61,6 @@ const DriveFileItem: React.FC<DriveFileItemProps> = ({
     return `${mb.toFixed(1)} MB`
   }
 
-  const formatDate = (dateString?: string) => {
-    if (!dateString) return ''
-    
-    try {
-      const date = new Date(dateString)
-      const now = new Date()
-      const diffMs = now.getTime() - date.getTime()
-      const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24))
-
-      if (diffDays === 0) return 'Today'
-      if (diffDays === 1) return 'Yesterday'
-      if (diffDays < 7) return `${diffDays} days ago`
-      if (diffDays < 30) return `${Math.floor(diffDays / 7)} weeks ago`
-      
-      return date.toLocaleDateString('en-US', { 
-        month: 'short', 
-        day: 'numeric',
-        year: date.getFullYear() !== now.getFullYear() ? 'numeric' : undefined
-      })
-    } catch {
-      return dateString
-    }
-  }
 
   const handleClick = () => {
     // Single click on folder just highlights it (no action)
@@ -142,7 +120,7 @@ const DriveFileItem: React.FC<DriveFileItemProps> = ({
             {file.name}
           </div>
           <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-            {formatFileSize(file.size) || formatDate(file.modifiedTime)}
+            {formatFileSize(file.size) || formatFileDate(file.modifiedTime)}
           </div>
         </div>
       </div>
@@ -185,7 +163,7 @@ const DriveFileItem: React.FC<DriveFileItemProps> = ({
           {file.name}
         </p>
         <p className="text-xs text-gray-500 dark:text-gray-400">
-          {formatDate(file.modifiedTime)}
+          {formatFileDate(file.modifiedTime)}
           {file.size && ` • ${formatFileSize(file.size)}`}
         </p>
       </div>

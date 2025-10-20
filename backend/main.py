@@ -163,7 +163,7 @@ async def lifespan(app: FastAPI):
         try:
             notification_storage = NotificationStorage(settings.storage.working_dir)
             notification_service = NotificationService(storage=notification_storage)
-            cutoff_date = datetime.now() - timedelta(days=7)
+            cutoff_date = datetime.utcnow() - timedelta(days=7)
             deleted_count = await notification_service.cleanup_expired(cutoff_date)
             logger.info(f"[OK] Notification cleanup: removed {deleted_count} expired notifications")
         except Exception as cleanup_error:

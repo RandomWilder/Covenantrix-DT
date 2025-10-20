@@ -8,6 +8,7 @@ import { useSubscription } from '../../contexts/SubscriptionContext';
 import { useTranslation } from 'react-i18next';
 import { AlertTriangle, Clock, TrendingUp, ChevronDown, ChevronUp } from 'lucide-react';
 import type { ViolationRecord } from '../../types/subscription';
+import { formatDate } from '../../utils/dateUtils';
 
 export const GracePeriodWarning: React.FC = () => {
   const { subscription, getDaysRemaining, getAnalytics } = useSubscription();
@@ -50,9 +51,6 @@ export const GracePeriodWarning: React.FC = () => {
     }
   };
 
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString();
-  };
 
   const getViolationTypeLabel = (type: string) => {
     switch (type) {

@@ -106,7 +106,7 @@ async def cleanup_notifications(
 ):
     """Manually trigger cleanup of expired notifications (older than 7 days)."""
     try:
-        cutoff_date = datetime.now() - timedelta(days=7)
+        cutoff_date = datetime.utcnow() - timedelta(days=7)
         deleted_count = await service.cleanup_expired(cutoff_date)
         return CleanupResponse(deleted_count=deleted_count, success=True)
     except Exception as e:
