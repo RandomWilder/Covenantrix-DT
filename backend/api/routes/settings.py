@@ -216,7 +216,7 @@ async def update_settings(request: SettingsUpdateRequest):
             subscription_service = get_subscription_service()
             current_subscription = await subscription_service.get_current_subscription_async()
             
-            if not current_subscription.features.use_default_keys:
+            if not current_subscription.get_features().use_default_keys:
                 raise HTTPException(
                     status_code=403,
                     detail={

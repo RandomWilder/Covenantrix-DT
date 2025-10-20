@@ -483,8 +483,8 @@ def get_subscription_aware_document_service(
     
     # Use subscription-based file size limit if available
     max_file_size_mb = settings.storage.max_file_size_mb
-    if subscription.features.max_doc_size_mb > 0:
-        max_file_size_mb = min(max_file_size_mb, subscription.features.max_doc_size_mb)
+    if subscription.get_features().max_doc_size_mb > 0:
+        max_file_size_mb = min(max_file_size_mb, subscription.get_features().max_doc_size_mb)
     
     return DocumentService(
         rag_engine=rag_engine,

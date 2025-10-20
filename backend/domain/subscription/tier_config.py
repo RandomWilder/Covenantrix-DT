@@ -45,24 +45,22 @@ TIER_LIMITS = {
 }
 
 
-def get_tier_features(tier: str, jwt_features: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+def get_tier_features(tier: str) -> Dict[str, Any]:
     """
-    Extract feature flags from tier config with optional JWT override
+    Get tier features from config only
     
     Args:
         tier: Subscription tier name
-        jwt_features: Optional JWT features to override hardcoded limits
         
     Returns:
         Dictionary of feature flags (excluding duration/grace period)
-        JWT features take precedence over hardcoded tier limits
     """
     if tier not in TIER_LIMITS:
         raise ValueError(f"Invalid tier: {tier}. Must be one of: {list(TIER_LIMITS.keys())}")
     
     config = TIER_LIMITS[tier]
     
-    # Start with hardcoded tier features
+    # Return tier features from config
     features = {
         "max_documents": config["max_documents"],
         "max_doc_size_mb": config["max_doc_size_mb"],
@@ -71,12 +69,6 @@ def get_tier_features(tier: str, jwt_features: Optional[Dict[str, Any]] = None) 
         "max_queries_daily": config["max_queries_daily"],
         "use_default_keys": config["use_default_keys"]
     }
-    
-    # Override with JWT features if provided
-    if jwt_features:
-        for key, value in jwt_features.items():
-            if key in features and value is not None:
-                features[key] = value
     
     return features
 

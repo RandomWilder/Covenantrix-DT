@@ -78,7 +78,7 @@ class LicenseValidator:
                 raise ValueError(f"Unsupported JWT algorithm: {algorithm}")
             
             # Validate required fields
-            required_fields = ["tier", "issued", "expiry", "license_id", "features"]
+            required_fields = ["tier", "issued", "expiry", "license_id"]
             for field in required_fields:
                 if field not in payload:
                     raise ValueError(f"Missing required field in JWT: {field}")
@@ -126,12 +126,12 @@ class LicenseValidator:
             issued_ms = payload["issued"]
             issued_dt = datetime.fromtimestamp(issued_ms / 1000)
             
-            # Build feature flags
-            features_data = payload["features"]
-            features = FeatureFlags(**features_data)
-            
             # Determine expiry field based on tier
             tier = payload["tier"]
+            
+            # Features are now computed from tier, not stored in JWT
+            # We'll let the SubscriptionSettings model compute features from tier
+            # This ensures single source of truth
             trial_expires_at = None
             grace_period_expires_at = None
             
@@ -148,7 +148,7 @@ class LicenseValidator:
                 trial_expires_at=trial_expires_at,
                 grace_period_started_at=None,  # Will be set by service
                 grace_period_expires_at=grace_period_expires_at,
-                features=features,
+                features=None,  # Features are now computed from tier
                 last_tier_change=datetime.utcnow().isoformat()
             )
             
@@ -161,8 +161,7 @@ class LicenseValidator:
     def generate_test_token(
         self,
         tier: str,
-        duration_days: int = 365,
-        features: Optional[Dict[str, Any]] = None
+        duration_days: int = 365
     ) -> str:
         """
         Generate a test JWT token (for development/testing only)
@@ -171,7 +170,6 @@ class LicenseValidator:
         Args:
             tier: Subscription tier
             duration_days: License duration in days
-            features: Optional custom features dict
             
         Returns:
             JWT token string
@@ -182,17 +180,11 @@ class LicenseValidator:
         issued_ms = int(now.timestamp() * 1000)
         expiry_ms = int((now.timestamp() + (duration_days * 24 * 60 * 60)) * 1000)
         
-        # Default features based on tier
-        if features is None:
-            from .tier_config import get_tier_features
-            features = get_tier_features(tier)
-        
         payload = {
             "tier": tier,
             "issued": issued_ms,
             "expiry": expiry_ms,
-            "license_id": str(uuid.uuid4()),
-            "features": features
+            "license_id": str(uuid.uuid4())
         }
         
         # Generate unverified token (for testing)

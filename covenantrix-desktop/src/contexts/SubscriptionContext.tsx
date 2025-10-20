@@ -6,6 +6,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { SubscriptionSettings, UsageStats, SubscriptionContextValue, SubscriptionAnalytics, TierHistoryEntry } from '../types/subscription';
 import { isElectron } from '../utils/environment';
+import { getTierLimits } from '../utils/tierLimits';
 
 const SubscriptionContext = createContext<SubscriptionContextValue | undefined>(undefined);
 
@@ -42,7 +43,8 @@ export const SubscriptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
   const canUploadDocument = useCallback((): boolean => {
     if (!subscription || !usage) return false;
     
-    const { max_documents } = subscription.features;
+    // Use computed features from tier instead of stored features
+    const { max_documents } = getTierLimits(subscription.tier);
     if (max_documents === -1) return true;
     
     return usage.documents_uploaded < max_documents;
@@ -51,7 +53,8 @@ export const SubscriptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
   const canSendQuery = useCallback(async (): Promise<boolean> => {
     if (!subscription || !usage) return false;
     
-    const { max_queries_monthly, max_queries_daily } = subscription.features;
+    // Use computed features from tier instead of stored features
+    const { max_queries_monthly, max_queries_daily } = getTierLimits(subscription.tier);
     
     if (max_queries_monthly !== -1 && usage.monthly_remaining <= 0) return false;
     if (max_queries_daily !== -1 && usage.daily_remaining <= 0) return false;
@@ -63,9 +66,10 @@ export const SubscriptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
     if (!subscription || !usage) return 0;
     
     if (resource === 'documents') {
-      const max = subscription.features.max_documents;
-      if (max === -1) return -1;
-      return Math.max(0, max - usage.documents_uploaded);
+      // Use computed features from tier instead of stored features
+      const { max_documents } = getTierLimits(subscription.tier);
+      if (max_documents === -1) return -1;
+      return Math.max(0, max_documents - usage.documents_uploaded);
     } else {
       const monthlyRemaining = usage.monthly_remaining !== -1 ? usage.monthly_remaining : Infinity;
       const dailyRemaining = usage.daily_remaining !== -1 ? usage.daily_remaining : Infinity;

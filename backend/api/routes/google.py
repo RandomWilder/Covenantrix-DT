@@ -31,7 +31,7 @@ from api.schemas.documents import (
     BatchProgressEvent
 )
 from core.config import get_settings
-from core.dependencies import get_oauth_service, get_google_api_service, get_document_service
+from core.dependencies import get_oauth_service, get_google_api_service, get_document_service, get_subscription_service
 from domain.integrations.google_oauth import GoogleOAuthService
 from domain.integrations.exceptions import OAuthError
 from domain.documents.service import DocumentService
@@ -331,7 +331,8 @@ async def download_drive_files_stream(
     oauth_service: GoogleOAuthService = Depends(get_oauth_service),
     api_service: GoogleAPIService = Depends(get_google_api_service),
     document_service: DocumentService = Depends(get_document_service),
-    ocr_service: Optional[OCRService] = Depends(get_ocr_service)
+    ocr_service: Optional[OCRService] = Depends(get_ocr_service),
+    subscription_service = Depends(get_subscription_service)
 ):
     """
     Download files from Google Drive with streaming progress updates
@@ -469,12 +470,17 @@ async def download_drive_files_stream(
                         try:
                             event = await asyncio.wait_for(progress_queue.get(), timeout=0.1)
                             
+                            # Get actual message from registry (includes rotating messages)
+                            registry_data = await document_service.registry.get_document(document.id)
+                            processing_data = registry_data.get('processing', {}) if registry_data else {}
+                            actual_message = processing_data.get('message', document_service.STAGE_MESSAGES.get(event['stage'], "Processing..."))
+                            
                             # Create progress event from service callback
                             progress_event = DocumentProgressEvent(
                                 filename=filename,
                                 document_id=document.id,
                                 stage=DocumentProgressStage(event['stage']),
-                                message=document_service.STAGE_MESSAGES.get(event['stage'], "Processing..."),
+                                message=actual_message,
                                 progress_percent=event['percent'],
                                 timestamp=datetime.utcnow().isoformat()
                             )
@@ -496,11 +502,17 @@ async def download_drive_files_stream(
                     while not progress_queue.empty():
                         try:
                             event = progress_queue.get_nowait()
+                            
+                            # Get actual message from registry (includes rotating messages)
+                            registry_data = await document_service.registry.get_document(document.id)
+                            processing_data = registry_data.get('processing', {}) if registry_data else {}
+                            actual_message = processing_data.get('message', document_service.STAGE_MESSAGES.get(event['stage'], "Processing..."))
+                            
                             progress_event = DocumentProgressEvent(
                                 filename=filename,
                                 document_id=document.id,
                                 stage=DocumentProgressStage(event['stage']),
-                                message=document_service.STAGE_MESSAGES.get(event['stage'], "Processing..."),
+                                message=actual_message,
                                 progress_percent=event['percent'],
                                 timestamp=datetime.utcnow().isoformat()
                             )
@@ -509,6 +521,17 @@ async def download_drive_files_stream(
                             yield f"data: {batch_event.model_dump_json()}\n\n"
                         except asyncio.QueueEmpty:
                             break
+                    
+                    # Enhanced document recording with tier and format context
+                    file_extension = filename.split('.')[-1].lower() if '.' in filename else 'unknown'
+                    file_size_mb = len(content) / (1024 * 1024)  # Convert bytes to MB
+                    current_subscription = await subscription_service.get_current_subscription_async()
+                    await subscription_service.usage_tracker.record_document_upload(
+                        doc_id=document.id,
+                        size_mb=file_size_mb,
+                        tier_at_upload=current_subscription.tier,
+                        format=file_extension
+                    )
                     
                     logger.info(f"Drive file downloaded and processed: {filename} -> {document.id}")
                     

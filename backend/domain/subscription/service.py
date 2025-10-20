@@ -151,17 +151,9 @@ class SubscriptionService:
         now = datetime.utcnow()
         changed = False
         
-        # CRITICAL: Sync feature flags with tier config on every startup
-        # This ensures stored features always match current tier configuration
-        current_features = subscription.features.model_dump()
-        expected_features = get_tier_features(subscription.tier)
-        
-        if current_features != expected_features:
-            logger.info(f"Feature flags out of sync for {subscription.tier} tier, updating...")
-            settings.subscription.features = FeatureFlags(**expected_features)
-            await self.settings_storage.save_settings(settings)
-            logger.info(f"Feature flags synced: {expected_features}")
-            changed = True
+        # Features are now computed from tier - no need to sync stored features
+        # The computed_features property ensures single source of truth
+        logger.debug(f"Using computed features for tier: {subscription.tier}")
         
         # Initialize trial if first launch
         if subscription.tier == "trial" and subscription.trial_started_at is None:
@@ -221,17 +213,7 @@ class SubscriptionService:
         # Update tier and features
         settings.subscription.tier = new_tier
         
-        # Use JWT features if available, otherwise use hardcoded tier features
-        jwt_features = None
-        if settings.subscription.license_key:
-            try:
-                # Extract JWT features from stored license key
-                payload = self.license_validator.validate_jwt(settings.subscription.license_key)
-                jwt_features = payload.get("features")
-            except Exception as e:
-                logger.warning(f"Failed to extract JWT features during tier transition: {e}")
-        
-        settings.subscription.features = FeatureFlags(**get_tier_features(new_tier, jwt_features))
+        # Features are now computed from tier only - no need to store them
         settings.subscription.last_tier_change = datetime.utcnow().isoformat()
         
         # Handle specific transitions
@@ -304,7 +286,7 @@ class SubscriptionService:
             Tuple of (allowed, reason if not allowed)
         """
         subscription = await self.get_current_subscription_async()
-        max_documents = subscription.features.max_documents
+        max_documents = subscription.get_features().max_documents
         
         # Unlimited documents
         if max_documents == -1:
@@ -336,8 +318,8 @@ class SubscriptionService:
         """
         subscription = await self.get_current_subscription_async()
         tier_limits = {
-            "max_queries_monthly": subscription.features.max_queries_monthly,
-            "max_queries_daily": subscription.features.max_queries_daily
+            "max_queries_monthly": subscription.get_features().max_queries_monthly,
+            "max_queries_daily": subscription.get_features().max_queries_daily
         }
         
         allowed, reason = await self.usage_tracker.check_query_limit(tier_limits)
@@ -347,10 +329,10 @@ class SubscriptionService:
             # Determine which limit was exceeded
             if "monthly" in reason.lower():
                 violation_type = "monthly_query_limit"
-                limit = subscription.features.max_queries_monthly
+                limit = subscription.get_features().max_queries_monthly
             else:
                 violation_type = "daily_query_limit"
-                limit = subscription.features.max_queries_daily
+                limit = subscription.get_features().max_queries_daily
             
             # Get current usage to determine attempted amount
             usage_data = await self.usage_tracker.get_usage_stats()
@@ -412,7 +394,7 @@ class SubscriptionService:
             Feature flags dictionary
         """
         subscription = self.get_current_subscription()
-        return subscription.features.model_dump()
+        return subscription.get_features().model_dump()
     
     async def get_remaining_queries(self) -> Dict[str, Any]:
         """
@@ -423,8 +405,8 @@ class SubscriptionService:
         """
         subscription = await self.get_current_subscription_async()
         tier_limits = {
-            "max_queries_monthly": subscription.features.max_queries_monthly,
-            "max_queries_daily": subscription.features.max_queries_daily
+            "max_queries_monthly": subscription.get_features().max_queries_monthly,
+            "max_queries_daily": subscription.get_features().max_queries_daily
         }
         
         return await self.usage_tracker.get_remaining_queries(subscription.tier, tier_limits)
@@ -444,7 +426,7 @@ class SubscriptionService:
         settings.subscription.tier = "trial"
         settings.subscription.trial_started_at = now.isoformat()
         settings.subscription.trial_expires_at = (now + timedelta(days=trial_duration)).isoformat()
-        settings.subscription.features = FeatureFlags(**get_tier_features("trial"))
+        # Features are now computed from tier - no need to store them
         
         await self.settings_storage.save_settings(settings)
         
@@ -592,14 +574,14 @@ class SubscriptionService:
         daily_usage_pct = 0
         doc_usage_pct = 0
         
-        if subscription.features.max_queries_monthly > 0:
-            monthly_usage_pct = (usage_stats["queries_this_month"] / subscription.features.max_queries_monthly) * 100
+        if subscription.get_features().max_queries_monthly > 0:
+            monthly_usage_pct = (usage_stats["queries_this_month"] / subscription.get_features().max_queries_monthly) * 100
         
-        if subscription.features.max_queries_daily > 0:
-            daily_usage_pct = (usage_stats["queries_today"] / subscription.features.max_queries_daily) * 100
+        if subscription.get_features().max_queries_daily > 0:
+            daily_usage_pct = (usage_stats["queries_today"] / subscription.get_features().max_queries_daily) * 100
         
-        if subscription.features.max_documents > 0:
-            doc_usage_pct = (usage_stats["documents_uploaded"] / subscription.features.max_documents) * 100
+        if subscription.get_features().max_documents > 0:
+            doc_usage_pct = (usage_stats["documents_uploaded"] / subscription.get_features().max_documents) * 100
         
         # Generate warnings
         warnings = []
@@ -619,7 +601,7 @@ class SubscriptionService:
         
         return {
             "tier": subscription.tier,
-            "features": subscription.features.model_dump(),
+            "features": subscription.get_features().model_dump(),
             "usage_stats": usage_stats,
             "remaining": remaining,
             "usage_percentages": {

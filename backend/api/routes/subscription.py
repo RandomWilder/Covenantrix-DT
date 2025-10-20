@@ -128,7 +128,7 @@ async def get_subscription_status(
         
         return SubscriptionStatusResponse(
             tier=subscription.tier,
-            features=subscription.features,
+            features=subscription.get_features(),  # Use computed features
             trial_started_at=subscription.trial_started_at,
             trial_expires_at=subscription.trial_expires_at,
             grace_period_started_at=subscription.grace_period_started_at,
@@ -161,7 +161,7 @@ async def activate_license(
             success=True,
             new_tier=new_subscription.tier,
             message=f"License activated successfully. Welcome to {new_subscription.tier} tier!",
-            features=new_subscription.features
+            features=new_subscription.get_features()  # Use computed features
         )
         
     except ValueError as e:
@@ -244,11 +244,15 @@ async def validate_license(
         expiry_ms = payload["expiry"]
         expiry_dt = datetime.fromtimestamp(expiry_ms / 1000)
         
+        # Compute features from tier instead of JWT
+        from domain.subscription.tier_config import get_tier_features
+        computed_features = get_tier_features(payload["tier"])
+        
         return ValidateLicenseResponse(
             valid=True,
             tier=payload["tier"],
             expiry=expiry_dt.isoformat(),
-            features=payload["features"]
+            features=computed_features
         )
         
     except ValueError as e:

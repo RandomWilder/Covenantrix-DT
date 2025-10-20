@@ -174,8 +174,20 @@ class SubscriptionSettings(BaseModel):
     trial_expires_at: Optional[str] = Field(default=None, description="ISO datetime when trial ends")
     grace_period_started_at: Optional[str] = Field(default=None, description="When grace period began")
     grace_period_expires_at: Optional[str] = Field(default=None, description="When grace period ends")
-    features: FeatureFlags = Field(default_factory=FeatureFlags)
+    features: Optional[FeatureFlags] = Field(default=None, description="Legacy stored features (deprecated - use computed features)")
     last_tier_change: Optional[str] = Field(default=None, description="ISO datetime of last tier change")
+    
+    @property
+    def computed_features(self) -> FeatureFlags:
+        """Computed features from tier - single source of truth"""
+        from domain.subscription.tier_config import get_tier_features
+        features_data = get_tier_features(self.tier)
+        return FeatureFlags(**features_data)
+    
+    def get_features(self) -> FeatureFlags:
+        """Get features - computed from tier (preferred) or fallback to stored"""
+        # Always prefer computed features from tier
+        return self.computed_features
 
 
 class ProfileSettings(BaseModel):

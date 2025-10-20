@@ -9,6 +9,7 @@ import { useTranslation } from 'react-i18next';
 import { AlertCircle, CheckCircle, Clock, Key, TrendingUp, AlertTriangle, BarChart3, History, ChevronDown, ChevronUp } from 'lucide-react';
 import { ConfettiEffect } from '../../components/ui/ConfettiEffect';
 import { AnalyticsDashboard } from './AnalyticsDashboard';
+import { getTierLimits, getDisplayLimit } from '../../utils/tierLimits';
 import type { TierStatus, TierHistoryEntry } from '../../types/subscription';
 
 export const SubscriptionTab: React.FC = () => {
@@ -210,7 +211,7 @@ export const SubscriptionTab: React.FC = () => {
               {t('subscription.documents', 'Documents')}:
             </span>
             <span className="font-medium text-gray-900 dark:text-gray-100">
-              {usage.documents_uploaded} / {subscription.features.max_documents === -1 ? '∞' : subscription.features.max_documents}
+              {usage.documents_uploaded} / {getDisplayLimit(subscription.tier, 'max_documents')}
             </span>
           </div>
           
@@ -219,7 +220,7 @@ export const SubscriptionTab: React.FC = () => {
               {t('subscription.queries_monthly', 'Queries (Monthly)')}:
             </span>
             <span className="font-medium text-gray-900 dark:text-gray-100">
-              {usage.queries_this_month} / {subscription.features.max_queries_monthly === -1 ? '∞' : subscription.features.max_queries_monthly}
+              {usage.queries_this_month} / {getDisplayLimit(subscription.tier, 'max_queries_monthly')}
             </span>
           </div>
           
@@ -228,7 +229,7 @@ export const SubscriptionTab: React.FC = () => {
               {t('subscription.queries_daily', 'Queries (Daily)')}:
             </span>
             <span className="font-medium text-gray-900 dark:text-gray-100">
-              {usage.queries_today} / {subscription.features.max_queries_daily === -1 ? '∞' : subscription.features.max_queries_daily}
+              {usage.queries_today} / {getDisplayLimit(subscription.tier, 'max_queries_daily')}
             </span>
           </div>
           
@@ -237,7 +238,7 @@ export const SubscriptionTab: React.FC = () => {
               {t('subscription.max_file_size', 'Max File Size')}:
             </span>
             <span className="font-medium text-gray-900 dark:text-gray-100">
-              {subscription.features.max_doc_size_mb}MB
+              {getTierLimits(subscription.tier).max_doc_size_mb}MB
             </span>
           </div>
           
@@ -245,8 +246,8 @@ export const SubscriptionTab: React.FC = () => {
             <span className="text-gray-700 dark:text-gray-300">
               {t('subscription.default_api_keys', 'Default API Keys')}:
             </span>
-            <span className={`font-medium ${subscription.features.use_default_keys ? 'text-green-600' : 'text-gray-500'}`}>
-              {subscription.features.use_default_keys ? t('common.available', 'Available') : t('common.not_available', 'Not Available')}
+            <span className={`font-medium ${getTierLimits(subscription.tier).use_default_keys ? 'text-green-600' : 'text-gray-500'}`}>
+              {getTierLimits(subscription.tier).use_default_keys ? t('common.available', 'Available') : t('common.not_available', 'Not Available')}
             </span>
           </div>
         </div>

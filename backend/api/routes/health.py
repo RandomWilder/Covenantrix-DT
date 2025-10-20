@@ -49,7 +49,7 @@ async def detailed_health(
             subscription = subscription_service.get_current_subscription()
             subscription_status = {
                 "tier": subscription.tier,
-                "features": subscription.features.model_dump(),
+                "features": subscription.get_features().model_dump(),
                 "trial_started_at": subscription.trial_started_at,
                 "trial_expires_at": subscription.trial_expires_at,
                 "grace_period_started_at": subscription.grace_period_started_at,

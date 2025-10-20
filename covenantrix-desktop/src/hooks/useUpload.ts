@@ -4,6 +4,7 @@ import { useSubscription } from '../contexts/SubscriptionContext'
 import { useUpgradeModal } from '../contexts/UpgradeModalContext'
 import { DocumentsApi } from '../services/api/DocumentsApi'
 import { DocumentProgressStage } from '../types/document'
+import { getTierLimits } from '../utils/tierLimits'
 
 interface FileItem {
   id: string
@@ -302,7 +303,7 @@ export const useUpload = () => {
       const remaining = getRemainingQuota('documents')
       showUpgradeModal({
         title: 'Document Limit Reached',
-        message: `You've reached the maximum of ${subscription?.features.max_documents} documents for the ${subscription?.tier} tier.`,
+        message: `You've reached the maximum of ${subscription ? getTierLimits(subscription.tier).max_documents : 0} documents for the ${subscription?.tier} tier.`,
         currentTier: subscription?.tier,
         details: `Remaining documents: ${remaining}`
       })
@@ -311,7 +312,7 @@ export const useUpload = () => {
     
     // Check file sizes
     if (subscription) {
-      const maxSizeMB = subscription.features.max_doc_size_mb
+      const maxSizeMB = getTierLimits(subscription.tier).max_doc_size_mb
       const oversizedFiles = newFiles.filter(f => (f.size / (1024 * 1024)) > maxSizeMB)
       
       if (oversizedFiles.length > 0) {

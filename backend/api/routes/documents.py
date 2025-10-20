@@ -653,7 +653,8 @@ async def upload_documents_batch(
 @router.post("/upload/drive", response_model=BatchUploadResponse)
 async def upload_from_google_drive(
     request: GoogleDriveFileRequest,
-    service: DocumentService = Depends(get_document_service)
+    service: DocumentService = Depends(get_document_service),
+    subscription_service = Depends(get_subscription_service)
 ) -> BatchUploadResponse:
     """
     Download and process files from Google Drive
@@ -694,6 +695,19 @@ async def upload_from_google_drive(
             filenames=filenames,
             max_concurrent=3
         )
+        
+        # Record usage for successful uploads
+        current_subscription = await subscription_service.get_current_subscription_async()
+        for result in results:
+            if result["success"] and result["document_id"]:
+                file_extension = result["filename"].split('.')[-1].lower() if '.' in result["filename"] else 'unknown'
+                file_size_mb = result["file_size"] / (1024 * 1024) if result["file_size"] else 0
+                await subscription_service.usage_tracker.record_document_upload(
+                    doc_id=result["document_id"],
+                    size_mb=file_size_mb,
+                    tier_at_upload=current_subscription.tier,
+                    format=file_extension
+                )
         
         # Convert to response format
         batch_items = [
