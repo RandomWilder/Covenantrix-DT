@@ -240,7 +240,8 @@ class ChatService:
                 # Stream tokens from RAG engine
                 async for token in self.rag_engine.query_stream(
                     query=full_query,
-                    mode="hybrid"
+                    mode="hybrid",
+                    document_ids=document_ids
                 ):
                     accumulated_content += token
                     yield {"token": token, "done": False}
@@ -272,6 +273,7 @@ class ChatService:
                 "done": True,
                 "message_id": assistant_message.id,
                 "conversation_id": conversation.id,
+                "conversation_title": conversation.title,
                 "sources": sources_dict
             }
             
@@ -375,7 +377,8 @@ class ChatService:
             # Execute RAG query
             result = await self.rag_engine.query(
                 query=full_query,
-                mode="hybrid"  # Use hybrid mode for best results
+                mode="hybrid",  # Use hybrid mode for best results
+                document_ids=document_ids
             )
             
             response_content = result.get("response", "I couldn't process your request.")

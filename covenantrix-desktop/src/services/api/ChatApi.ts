@@ -34,6 +34,7 @@ export class ChatApi extends ApiService {
     done: boolean
     message_id?: string
     conversation_id?: string
+    conversation_title?: string
     sources?: any[]
   }> {
     const url = `${this.getBaseURL()}/chat/message/stream`

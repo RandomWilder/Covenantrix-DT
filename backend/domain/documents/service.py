@@ -251,8 +251,10 @@ class DocumentService:
                     self._rotate_messages(document.id, progress_callback)
                 )
                 
-                # Insert into LightRAG (this is all LightRAG needs - just text!)
-                await self.rag_engine.insert(extracted_content)
+                # Insert into LightRAG and capture LightRAG doc ID
+                lightrag_doc_id = await self.rag_engine.insert(extracted_content)
+                # Store the mapping in registry
+                await self.registry.store_lightrag_doc_id(document.id, lightrag_doc_id)
                 
             finally:
                 # Always cancel rotation task
@@ -515,14 +517,11 @@ class DocumentService:
         
         logger.info(f"Querying documents: '{query_text[:50]}...' (mode: {mode})")
         
-        # Note: document_ids filter not supported by LightRAG - queries all content
-        if document_ids:
-            logger.warning("Document scope filtering not supported by LightRAG - querying all content")
-        
-        # Execute RAG query (LightRAG queries ALL content in working_dir)
+        # Execute RAG query (optionally filtered by document_ids)
         result = await self.rag_engine.query(
             query=query_text,
-            mode=mode
+            mode=mode,
+            document_ids=document_ids
         )
         
         # Get document count from registry

@@ -102,18 +102,11 @@ class AgentDataAccessService(IAgentDataAccess):
             Query results with response and metadata
         """
         try:
-            # Use RAG engine to query documents
-            if document_ids:
-                # Query specific documents
-                results = await self.rag_engine.query_documents(
-                    query=query,
-                    document_ids=document_ids
-                )
-            else:
-                # Query all documents
-                results = await self.rag_engine.query(
-                    query=query
-                )
+            # Use RAG engine to query documents (optionally scoped)
+            results = await self.rag_engine.query(
+                query=query,
+                document_ids=document_ids
+            )
             
             return {
                 "response": results.get("response", ""),

@@ -124,6 +124,7 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
       let finalConversationId = ''
       let finalMessageId = ''
       let finalSources: any[] = []
+      let finalTitle = ''
 
       try {
         // Use streaming API
@@ -159,6 +160,7 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
             finalConversationId = chunk.conversation_id || activeConversation?.id || ''
             finalMessageId = chunk.message_id || assistantMessageId
             finalSources = chunk.sources || []
+            finalTitle = chunk.conversation_title || activeConversation?.title || ''
             break
           }
         }
@@ -171,6 +173,7 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
         finalConversationId = response.conversation_id
         finalMessageId = response.message_id
         finalSources = response.sources
+        finalTitle = '' // Non-streaming API doesn't return title, keep existing
         streamingSucceeded = true
       }
       
@@ -182,6 +185,7 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
           const updatedConversation = {
             ...currentConversation,
             id: finalConversationId, // Update with real conversation ID if it was temp
+            title: finalTitle || currentConversation.title, // Use backend-generated title
             messages: currentConversation.messages.map((msg) => {
               // Replace the placeholder assistant message with final response
               if (msg.id === assistantMessageId) {

@@ -53,10 +53,11 @@ class LightRAGStorage:
             return False
         
         try:
-            success = await self.rag_engine.insert(text, metadata)
-            if success:
-                self.logger.info(f"Stored document in RAG: {document_id}")
-            return success
+            lightrag_doc_id = await self.rag_engine.insert(text, metadata)
+            if lightrag_doc_id:
+                self.logger.info(f"Stored document in RAG: {document_id} -> {lightrag_doc_id}")
+                return True
+            return False
             
         except Exception as e:
             self.logger.error(f"Failed to store document: {e}")
@@ -66,7 +67,8 @@ class LightRAGStorage:
         self,
         query: str,
         mode: str = "hybrid",
-        top_k: int = 10
+        top_k: int = 10,
+        document_ids: Optional[List[str]] = None
     ) -> Dict[str, Any]:
         """
         Query documents in RAG
@@ -86,7 +88,7 @@ class LightRAGStorage:
                 "error": "RAG engine not initialized"
             }
         
-        return await self.rag_engine.query(query, mode, top_k)
+        return await self.rag_engine.query(query, mode, top_k, document_ids=document_ids)
     
     async def get_document_chunks(
         self,

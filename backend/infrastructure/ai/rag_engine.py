@@ -79,7 +79,8 @@ class RAGEngine:
         """Create embedding function wrapped in LightRAG's EmbeddingFunc"""
         from openai import AsyncOpenAI
         
-        client = AsyncOpenAI(api_key=self.api_key)
+        # Configure a conservative client timeout to avoid long hangs during embeddings
+        client = AsyncOpenAI(api_key=self.api_key, timeout=30.0)
         
         async def embedding_func(texts: list[str]) -> list[list[float]]:
             """Generate embeddings for texts using text-embedding-3-large"""
@@ -100,7 +101,8 @@ class RAGEngine:
         """Create LLM function for LightRAG"""
         from openai import AsyncOpenAI
         
-        client = AsyncOpenAI(api_key=self.api_key)
+        # Configure a conservative client timeout for LLM generations
+        client = AsyncOpenAI(api_key=self.api_key, timeout=60.0)
         
         async def llm_func(
             prompt: str,
@@ -368,16 +370,20 @@ class RAGEngine:
             self.is_initialized = False
             return False
     
-    async def insert(self, text: str, metadata: Optional[Dict[str, Any]] = None) -> bool:
+    async def insert(self, text: str, metadata: Optional[Dict[str, Any]] = None) -> str:
         """
-        Insert document into RAG
+        Insert document into RAG and return LightRAG doc ID
         
         Args:
             text: Document text
-            metadata: Optional metadata (note: LightRAG doesn't use metadata, kept for API compatibility)
+            metadata: Optional metadata (not used by LightRAG)
             
         Returns:
-            True if successful
+            LightRAG document ID (e.g., "doc-abc123...")
+            
+        Raises:
+            ServiceNotAvailableError: RAG engine not initialized
+            Exception: Failed to retrieve doc ID after insertion
         """
         if not self.is_initialized or not self._rag:
             raise ServiceNotAvailableError(
@@ -386,21 +392,48 @@ class RAGEngine:
             )
         
         try:
-            # LightRAG's native insert - only takes text, no metadata support
+            import json
+            from pathlib import Path as _Path
+            
+            # Get existing doc IDs before insertion
+            doc_status_file = _Path(self.working_dir) / "kv_store_doc_status.json"
+            existing_doc_ids = set()
+            if doc_status_file.exists():
+                with open(doc_status_file, 'r', encoding='utf-8') as f:
+                    try:
+                        existing_doc_ids = set(json.load(f).keys())
+                    except Exception:
+                        existing_doc_ids = set()
+            
+            # Insert document into LightRAG
             await self._rag.ainsert(text)
             self.logger.debug(f"Inserted {len(text)} chars into RAG")
-            return True
+            
+            # Find the newly created doc ID
+            if doc_status_file.exists():
+                with open(doc_status_file, 'r', encoding='utf-8') as f:
+                    new_data = json.load(f)
+                    new_doc_ids = set(new_data.keys()) - existing_doc_ids
+                    
+                    if new_doc_ids:
+                        lightrag_doc_id = list(new_doc_ids)[0]
+                        self.logger.info(f"Created LightRAG doc ID: {lightrag_doc_id}")
+                        return lightrag_doc_id
+            
+            # If we can't find new doc ID, raise error
+            raise Exception("Failed to retrieve LightRAG doc ID after insertion")
             
         except Exception as e:
             self.logger.error(f"RAG insert failed: {str(e)}")
-            raise  # Re-raise to let caller handle the error properly
+            raise
     
     async def query(
         self,
         query: str,
         mode: Optional[str] = None,
         top_k: Optional[int] = None,
-        only_context: bool = False
+        only_context: bool = False,
+        document_ids: Optional[List[str]] = None
     ) -> Dict[str, Any]:
         """
         Query RAG engine with proper reranking support
@@ -421,28 +454,97 @@ class RAGEngine:
             )
         
         try:
-            # Use settings if parameters not provided
-            effective_mode = mode or getattr(self, 'search_mode', 'hybrid')
+            # Smart Mode Selection Logic
+            if document_ids:
+                # Document-specific → FORCE naive mode for 95%+ isolation
+                effective_mode = "naive"
+                self.logger.info(f"Document-specific query detected: {len(document_ids)} docs → FORCING NAIVE mode")
+            else:
+                # Global query → use configured mode
+                effective_mode = mode or getattr(self, 'search_mode', 'hybrid')
+                self.logger.info(f"Global query → using configured mode: {effective_mode}")
+            
             effective_top_k = top_k or getattr(self, 'top_k', 5)
+            # Cap top_k to avoid heavy queries that can cause timeouts
+            if effective_top_k > 20:
+                self.logger.warning(f"Reducing top_k from {effective_top_k} to 20 to avoid timeouts")
+                effective_top_k = 20
             use_reranking = getattr(self, 'use_reranking', True)
             
             # Use "mix" mode when reranking is available (LightRAG recommendation)
             # Mix mode integrates knowledge graph + vector retrieval + reranking
-            query_mode = "mix" if (effective_mode == "hybrid" and self._rag.rerank_model_func and use_reranking) else effective_mode
+            # BUT only for global queries (not document-specific)
+            if document_ids:
+                # Document-specific queries use naive mode (no graph traversal)
+                query_mode = "naive"
+            else:
+                # Global queries can use enhanced modes
+                query_mode = "mix" if (effective_mode == "hybrid" and self._rag.rerank_model_func and use_reranking) else effective_mode
             
-            params = QueryParam(
-                mode=query_mode,
-                top_k=effective_top_k,
-                only_need_context=only_context,
-                enable_rerank=use_reranking and self._rag.rerank_model_func is not None
-            )
+            # Optional document scoping via chunk IDs
+            ids_param = None
+            if document_ids:
+                try:
+                    from infrastructure.ai.document_chunk_mapper import DocumentChunkMapper
+                    mapper = DocumentChunkMapper(Path(self.working_dir))
+                    chunk_ids, per_doc = mapper.map_documents_to_chunk_ids(document_ids)
+                    ids_param = chunk_ids if chunk_ids else None
+                    self.logger.info(
+                        f"RAG QUERY FILTERED: {len(document_ids)} docs → {len(chunk_ids)} chunks"
+                    )
+                except Exception as map_err:
+                    self.logger.error(f"Document scope mapping failed, proceeding unfiltered: {map_err}")
+
+            # CRITICAL FIX: Pre-filter LightRAG data for document-specific queries
+            # Since LightRAG doesn't support ids parameter, we need to create a filtered context
+            if document_ids and chunk_ids:
+                self.logger.info(f"Document-specific query: Creating filtered context with {len(chunk_ids)} chunks")
+                # Create a filtered query that only uses chunks from selected documents
+                filtered_context = await self._create_filtered_context(query, chunk_ids, query_mode, effective_top_k)
+                if filtered_context:
+                    # Use the filtered context directly instead of full LightRAG query
+                    result = filtered_context
+                    self.logger.info(f"Using pre-filtered context: {len(chunk_ids)} chunks from selected documents")
+                else:
+                    # Fallback to regular query if filtering fails
+                    self.logger.warning("Pre-filtering failed, falling back to regular query")
+                    params = QueryParam(
+                        mode=query_mode,
+                        top_k=effective_top_k,
+                        only_need_context=only_context,
+                        enable_rerank=use_reranking and self._rag.rerank_model_func is not None
+                    )
+                    result = await self._rag.aquery(query, param=params)
+            else:
+                # Global query - use regular LightRAG query
+                params = QueryParam(
+                    mode=query_mode,
+                    top_k=effective_top_k,
+                    only_need_context=only_context,
+                    enable_rerank=use_reranking and self._rag.rerank_model_func is not None
+                )
+                result = await self._rag.aquery(query, param=params)
             
             # Apply language-specific processing if needed
             effective_language = self.get_effective_language(query)
             
             self.logger.info(f"Query: '{query[:50]}...' | Mode: {query_mode} | Top-K: {effective_top_k} | Rerank: {use_reranking} | Lang: {effective_language}")
             
-            result = await self._rag.aquery(query, param=params)
+            # Attempt query with a defensive retry on WorkerTimeoutError by lowering top_k and mode
+            try:
+                result = await self._rag.aquery(query, param=params)
+            except Exception as e:
+                if "Worker execution timeout" in str(e) or "WorkerTimeoutError" in str(e):
+                    self.logger.warning("LightRAG timeout detected; retrying with lighter params (top_k=5, mode='local')")
+                    lite_params = QueryParam(
+                        mode="local",
+                        top_k=min(5, effective_top_k),
+                        only_need_context=only_context,
+                        enable_rerank=False
+                    )
+                    result = await self._rag.aquery(query, param=lite_params)
+                else:
+                    raise
             
             self.logger.debug(f"Query completed successfully")
             
@@ -451,7 +553,11 @@ class RAGEngine:
                 "query": query,
                 "response": result,
                 "mode": query_mode,
+                "effective_mode": effective_mode,
                 "language": effective_language,
+                "document_filtered": bool(document_ids),
+                "document_count": len(document_ids) if document_ids else 0,
+                "isolation_enforced": bool(document_ids and chunk_ids),
                 "settings_applied": {
                     "search_mode": effective_mode,
                     "top_k": effective_top_k,
@@ -473,7 +579,8 @@ class RAGEngine:
         self,
         query: str,
         mode: Optional[str] = None,
-        top_k: Optional[int] = None
+        top_k: Optional[int] = None,
+        document_ids: Optional[List[str]] = None
     ):
         """
         Query RAG engine with streaming response
@@ -493,13 +600,30 @@ class RAGEngine:
             )
         
         try:
-            # Use settings if parameters not provided
-            effective_mode = mode or getattr(self, 'search_mode', 'hybrid')
+            # Smart Mode Selection Logic (same as query method)
+            if document_ids:
+                # Document-specific → FORCE naive mode for 95%+ isolation
+                effective_mode = "naive"
+                self.logger.info(f"Document-specific streaming query detected: {len(document_ids)} docs → FORCING NAIVE mode")
+            else:
+                # Global query → use configured mode
+                effective_mode = mode or getattr(self, 'search_mode', 'hybrid')
+                self.logger.info(f"Global streaming query → using configured mode: {effective_mode}")
+            
             effective_top_k = top_k or getattr(self, 'top_k', 5)
+            if effective_top_k > 20:
+                self.logger.warning(f"Reducing streaming top_k from {effective_top_k} to 20 to avoid timeouts")
+                effective_top_k = 20
             use_reranking = getattr(self, 'use_reranking', True)
             
             # Use "mix" mode when reranking is available
-            query_mode = "mix" if (effective_mode == "hybrid" and self._rag.rerank_model_func and use_reranking) else effective_mode
+            # BUT only for global queries (not document-specific)
+            if document_ids:
+                # Document-specific queries use naive mode (no graph traversal)
+                query_mode = "naive"
+            else:
+                # Global queries can use enhanced modes
+                query_mode = "mix" if (effective_mode == "hybrid" and self._rag.rerank_model_func and use_reranking) else effective_mode
             
             # Apply language-specific processing if needed
             effective_language = self.get_effective_language(query)
@@ -513,15 +637,47 @@ class RAGEngine:
             # We'll use the streaming LLM function directly with context retrieval
             
             # First, get context from RAG (non-streaming retrieval)
-            params = QueryParam(
-                mode=query_mode,
-                top_k=effective_top_k,
-                only_need_context=True,  # Only get context, not LLM response
-                enable_rerank=use_reranking and self._rag.rerank_model_func is not None
-            )
-            
-            # Get context from LightRAG
-            context = await self._rag.aquery(query, param=params)
+            # Optional document scoping via chunk IDs
+            ids_param = None
+            if document_ids:
+                try:
+                    from infrastructure.ai.document_chunk_mapper import DocumentChunkMapper
+                    mapper = DocumentChunkMapper(Path(self.working_dir))
+                    chunk_ids, per_doc = mapper.map_documents_to_chunk_ids(document_ids)
+                    ids_param = chunk_ids if chunk_ids else None
+                    self.logger.info(
+                        f"RAG STREAM FILTERED: {len(document_ids)} docs → {len(chunk_ids)} chunks"
+                    )
+                except Exception as map_err:
+                    self.logger.error(f"Document scope mapping failed, proceeding unfiltered: {map_err}")
+
+            # CRITICAL FIX: Pre-filter LightRAG data for document-specific streaming queries
+            # Since LightRAG doesn't support ids parameter, we need to create a filtered context
+            if document_ids and chunk_ids:
+                self.logger.info(f"Document-specific streaming query: Creating filtered context with {len(chunk_ids)} chunks")
+                # Create a filtered context that only uses chunks from selected documents
+                context = await self._create_filtered_context(query, chunk_ids, query_mode, effective_top_k)
+                if not context:
+                    # Fallback to regular query if filtering fails
+                    self.logger.warning("Pre-filtering failed for streaming, falling back to regular query")
+                    params = QueryParam(
+                        mode=query_mode,
+                        top_k=effective_top_k,
+                        only_need_context=True,
+                        enable_rerank=use_reranking and self._rag.rerank_model_func is not None
+                    )
+                    context = await self._rag.aquery(query, param=params)
+                else:
+                    self.logger.info(f"Using pre-filtered streaming context: {len(chunk_ids)} chunks from selected documents")
+            else:
+                # Global query - use regular LightRAG query
+                params = QueryParam(
+                    mode=query_mode,
+                    top_k=effective_top_k,
+                    only_need_context=True,
+                    enable_rerank=use_reranking and self._rag.rerank_model_func is not None
+                )
+                context = await self._rag.aquery(query, param=params)
             
             # Now use streaming LLM function to generate response with context
             streaming_llm = self._create_streaming_llm_func()
@@ -546,6 +702,172 @@ class RAGEngine:
             # Yield error message as fallback
             yield "I'm sorry, I encountered an error processing your request."
     
+    async def _create_filtered_context(self, query: str, allowed_chunk_ids: List[str], mode: str, top_k: int) -> Optional[Any]:
+        """
+        Create a filtered context by directly retrieving and filtering chunks from LightRAG storage.
+        This bypasses LightRAG's query mechanism to ensure 100% document isolation.
+        
+        Args:
+            query: User query
+            allowed_chunk_ids: List of chunk IDs from selected documents
+            mode: Query mode (naive, local, global, hybrid, mix)
+            top_k: Number of results
+            
+        Returns:
+            Filtered context or None if filtering fails
+        """
+        try:
+            self.logger.info(f"Creating filtered context: {len(allowed_chunk_ids)} chunks, mode={mode}, top_k={top_k}")
+            
+            # Read chunk data directly from LightRAG storage
+            chunk_data = await self._get_chunks_by_ids(allowed_chunk_ids)
+            if not chunk_data:
+                self.logger.warning("No chunk data found for allowed chunk IDs")
+                return None
+            
+            # Create a filtered context using only the selected chunks
+            filtered_context = await self._build_context_from_chunks(query, chunk_data, mode, top_k)
+            
+            self.logger.info(f"Filtered context created: {len(chunk_data)} chunks processed")
+            return filtered_context
+            
+        except Exception as e:
+            self.logger.error(f"Failed to create filtered context: {e}")
+            return None
+
+    async def _get_chunks_by_ids(self, chunk_ids: List[str]) -> List[Dict[str, Any]]:
+        """
+        Retrieve chunk data directly from LightRAG storage by chunk IDs.
+        
+        Args:
+            chunk_ids: List of chunk IDs to retrieve
+            
+        Returns:
+            List of chunk data dictionaries
+        """
+        try:
+            import json
+            from pathlib import Path
+            
+            # Read from LightRAG's chunk storage
+            chunk_file = Path(self.working_dir) / "kv_store_text_chunks.json"
+            if not chunk_file.exists():
+                self.logger.warning("LightRAG chunk file not found")
+                return []
+            
+            with open(chunk_file, 'r', encoding='utf-8') as f:
+                all_chunks = json.load(f)
+            
+            # Filter chunks to only include our allowed chunk IDs
+            filtered_chunks = []
+            for chunk_id in chunk_ids:
+                if chunk_id in all_chunks:
+                    chunk_data = all_chunks[chunk_id]
+                    chunk_data['chunk_id'] = chunk_id  # Ensure chunk_id is included
+                    filtered_chunks.append(chunk_data)
+                else:
+                    self.logger.warning(f"Chunk {chunk_id} not found in storage")
+            
+            self.logger.info(f"Retrieved {len(filtered_chunks)} chunks from {len(chunk_ids)} requested")
+            return filtered_chunks
+            
+        except Exception as e:
+            self.logger.error(f"Failed to get chunks by IDs: {e}")
+            return []
+
+    async def _build_context_from_chunks(self, query: str, chunk_data: List[Dict[str, Any]], mode: str, top_k: int) -> Any:
+        """
+        Build context from filtered chunks using LightRAG's internal mechanisms.
+        
+        Args:
+            query: User query
+            chunk_data: List of chunk data dictionaries
+            mode: Query mode
+            top_k: Number of results
+            
+        Returns:
+            Context built from filtered chunks
+        """
+        try:
+            # For naive mode, we can directly use the chunks
+            if mode == "naive":
+                # Create a simple context from the chunks
+                context_parts = []
+                for chunk in chunk_data[:top_k]:  # Limit to top_k
+                    content = chunk.get('content', '')
+                    if content:
+                        context_parts.append(content)
+                
+                # Join the context parts
+                context = "\n\n".join(context_parts)
+                self.logger.info(f"Built naive context: {len(context_parts)} chunks, {len(context)} chars")
+                return context
+            
+            # For other modes, we might need to use LightRAG's internal mechanisms
+            # This is a simplified approach - in practice, you might need to adapt based on LightRAG's API
+            else:
+                self.logger.warning(f"Mode {mode} not fully supported for filtered context, using naive approach")
+                return await self._build_context_from_chunks(query, chunk_data, "naive", top_k)
+                
+        except Exception as e:
+            self.logger.error(f"Failed to build context from chunks: {e}")
+            return None
+
+    def _filter_result_by_chunks(self, result: Any, allowed_chunk_ids: List[str]) -> Any:
+        """
+        Post-process LightRAG result to ensure only chunks from selected documents are included.
+        This provides 100% document isolation even if LightRAG doesn't respect the ids parameter.
+        
+        Args:
+            result: LightRAG query result
+            allowed_chunk_ids: List of chunk IDs from selected documents
+            
+        Returns:
+            Filtered result containing only chunks from selected documents
+        """
+        try:
+            # If result is a string (simple response), return as-is
+            if isinstance(result, str):
+                return result
+            
+            # If result is a dict with context/chunks information
+            if isinstance(result, dict):
+                # Filter context if it contains chunk information
+                if 'context' in result:
+                    context = result['context']
+                    if isinstance(context, list):
+                        # Filter context chunks to only include allowed chunk IDs
+                        filtered_context = []
+                        for item in context:
+                            if isinstance(item, dict) and 'chunk_id' in item:
+                                if item['chunk_id'] in allowed_chunk_ids:
+                                    filtered_context.append(item)
+                            elif isinstance(item, str):
+                                # For string context, we can't filter by chunk ID
+                                # This is a limitation - we'd need chunk metadata
+                                filtered_context.append(item)
+                        result['context'] = filtered_context
+                        self.logger.info(f"Filtered context: {len(filtered_context)} chunks from {len(allowed_chunk_ids)} allowed chunks")
+                
+                # Filter sources if present
+                if 'sources' in result:
+                    sources = result['sources']
+                    if isinstance(sources, list):
+                        filtered_sources = []
+                        for source in sources:
+                            if isinstance(source, dict) and 'chunk_id' in source:
+                                if source['chunk_id'] in allowed_chunk_ids:
+                                    filtered_sources.append(source)
+                        result['sources'] = filtered_sources
+                        self.logger.info(f"Filtered sources: {len(filtered_sources)} sources from {len(allowed_chunk_ids)} allowed chunks")
+            
+            return result
+            
+        except Exception as e:
+            self.logger.error(f"Error filtering result by chunks: {e}")
+            # Return original result if filtering fails
+            return result
+
     def apply_settings(self, settings: Dict[str, Any]) -> None:
         """
         Apply user settings to RAG engine

@@ -203,6 +203,41 @@ class DocumentRegistry:
             except Exception as e:
                 self.logger.error(f"Failed to update processing stage: {e}")
                 return False
+
+    async def store_lightrag_doc_id(
+        self,
+        document_id: str,
+        lightrag_doc_id: str
+    ) -> bool:
+        """
+        Store LightRAG document ID for mapping
+        
+        Args:
+            document_id: User document UUID
+            lightrag_doc_id: LightRAG-generated doc ID (e.g., "doc-abc123...")
+            
+        Returns:
+            True if successful
+        """
+        async with self._lock:
+            try:
+                data = self._read_registry()
+                
+                if document_id not in data["documents"]:
+                    self.logger.warning(f"Document not found in registry: {document_id}")
+                    return False
+                
+                # Store the LightRAG doc ID
+                data["documents"][document_id]["lightrag_doc_id"] = lightrag_doc_id
+                data["documents"][document_id]["updated_at"] = datetime.utcnow().isoformat()
+                
+                self._write_registry(data)
+                self.logger.info(f"Stored LightRAG doc ID for {document_id}: {lightrag_doc_id}")
+                return True
+                
+            except Exception as e:
+                self.logger.error(f"Failed to store LightRAG doc ID: {e}")
+                return False
     
     async def get_document(self, document_id: str) -> Optional[Dict[str, Any]]:
         """
