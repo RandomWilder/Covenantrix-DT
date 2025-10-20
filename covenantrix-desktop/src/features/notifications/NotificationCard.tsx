@@ -88,8 +88,23 @@ export function NotificationCard({
               <div className="mt-3 mb-3">
                 <div className="space-y-2">
                   <div className="flex items-center justify-between text-sm">
-                    <span className="text-gray-700 dark:text-gray-300 font-medium">
-                      Downloading update...
+                    <span className="text-gray-700 dark:text-gray-300 font-medium flex items-center gap-2">
+                      {notification.downloadProgress.percent === 0 ? (
+                        <>
+                          <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></div>
+                          Starting download...
+                        </>
+                      ) : notification.downloadProgress.percent === 100 ? (
+                        <>
+                          <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                          Download completed
+                        </>
+                      ) : (
+                        <>
+                          <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></div>
+                          Downloading update...
+                        </>
+                      )}
                     </span>
                     <span className="text-gray-600 dark:text-gray-400 font-mono">
                       {Math.round(notification.downloadProgress.percent)}%
@@ -97,11 +112,16 @@ export function NotificationCard({
                   </div>
                   
                   {/* Progress bar */}
-                  <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2.5">
+                  <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2.5 overflow-hidden">
                     <div
-                      className="bg-blue-600 h-2.5 rounded-full transition-all duration-300 ease-out"
+                      className="bg-gradient-to-r from-blue-500 to-blue-600 h-2.5 rounded-full transition-all duration-500 ease-out relative"
                       style={{ width: `${notification.downloadProgress.percent}%` }}
-                    ></div>
+                    >
+                      {/* Animated shimmer effect */}
+                      {notification.downloadProgress.percent > 0 && notification.downloadProgress.percent < 100 && (
+                        <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent animate-pulse"></div>
+                      )}
+                    </div>
                   </div>
                   
                   {/* Download stats */}
@@ -109,9 +129,14 @@ export function NotificationCard({
                     <span>
                       {formatBytes(notification.downloadProgress.transferred)} / {formatBytes(notification.downloadProgress.total)}
                     </span>
-                    {notification.downloadProgress.percent > 0 && (
+                    {notification.downloadProgress.percent > 0 && notification.downloadProgress.percent < 100 && (
                       <span>
                         {formatBytes(notification.downloadProgress.total - notification.downloadProgress.transferred)} remaining
+                      </span>
+                    )}
+                    {notification.downloadProgress.percent === 100 && (
+                      <span className="text-green-600 dark:text-green-400 font-medium">
+                        Ready to install
                       </span>
                     )}
                   </div>

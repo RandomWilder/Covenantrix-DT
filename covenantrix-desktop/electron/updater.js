@@ -63,11 +63,14 @@ class UpdateManager {
       const message = `Download speed: ${progressObj.bytesPerSecond} - Downloaded ${progressObj.percent.toFixed(2)}% (${progressObj.transferred}/${progressObj.total})`;
       log.info(message);
       
-      this.sendStatusToWindow('downloading', {
+      const progressData = {
         percent: progressObj.percent,
         transferred: progressObj.transferred,
         total: progressObj.total
-      });
+      };
+      
+      log.info('Sending download progress to renderer:', progressData);
+      this.sendStatusToWindow('downloading', progressData);
     });
 
     // Update downloaded
@@ -105,7 +108,10 @@ class UpdateManager {
 
   sendStatusToWindow(status, data = null) {
     if (this.mainWindow && this.mainWindow.webContents) {
+      log.info('Sending status to window:', { status, data });
       this.mainWindow.webContents.send('update-status', { status, data });
+    } else {
+      log.warn('Cannot send status to window - mainWindow or webContents not available');
     }
   }
 

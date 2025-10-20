@@ -98,16 +98,27 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
             }
             
             // Keep notification open and mark as downloading
+            console.log('[NotificationContext] Setting notification as downloading:', notificationId);
             setNotifications(prev => 
-              prev.map(n => n.id === notificationId ? {
-                ...n,
-                downloadProgress: {
-                  percent: 0,
-                  transferred: 0,
-                  total: 0,
-                  isDownloading: true
+              prev.map(n => {
+                if (n.id === notificationId) {
+                  console.log('[NotificationContext] Updating notification to downloading state:', {
+                    notificationId: n.id,
+                    type: n.type,
+                    wasDownloading: n.downloadProgress?.isDownloading
+                  });
+                  return {
+                    ...n,
+                    downloadProgress: {
+                      percent: 0,
+                      transferred: 0,
+                      total: 0,
+                      isDownloading: true
+                    }
+                  };
                 }
-              } : n)
+                return n;
+              })
             );
             
             // Keep notification expanded to show progress
@@ -180,14 +191,30 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
 
     // Listen for update download progress
     const cleanupUpdateStatus = window.electronAPI.onUpdateStatus((updateData) => {
+      console.log('[NotificationContext] onUpdateStatus received:', updateData);
       const { status, data } = updateData;
       
       if (status === 'downloading' && data) {
+        console.log('[NotificationContext] Processing download progress:', {
+          percent: data.percent,
+          transferred: data.transferred,
+          total: data.total,
+          status
+        });
+        
         // Update the version_update notification with download progress
-        setNotifications(prev => 
-          prev.map(n => {
+        setNotifications(prev => {
+          const updated = prev.map(n => {
             // Find the update notification (version_update type)
             if (n.type === 'version_update' && n.downloadProgress?.isDownloading) {
+              console.log('[NotificationContext] Updating notification progress:', {
+                notificationId: n.id,
+                oldPercent: n.downloadProgress?.percent,
+                newPercent: data.percent,
+                oldTransferred: n.downloadProgress?.transferred,
+                newTransferred: data.transferred
+              });
+              
               return {
                 ...n,
                 downloadProgress: {
@@ -199,8 +226,16 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
               };
             }
             return n;
-          })
-        );
+          });
+          
+          console.log('[NotificationContext] Notifications updated, found downloading notifications:', 
+            updated.filter(n => n.downloadProgress?.isDownloading).length
+          );
+          
+          return updated;
+        });
+      } else {
+        console.log('[NotificationContext] Ignoring update status:', { status, hasData: !!data });
       }
     });
 
