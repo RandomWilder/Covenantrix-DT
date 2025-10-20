@@ -15,7 +15,24 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
     try {
       setIsLoading(true);
       const data = await notificationService.getAll();
-      setNotifications(data);
+      
+      // Preserve existing downloadProgress state
+      setNotifications(prev => {
+        const existingDownloadStates = new Map();
+        prev.forEach(n => {
+          if (n.downloadProgress?.isDownloading) {
+            existingDownloadStates.set(n.id, n.downloadProgress);
+          }
+        });
+        
+        return data.map(backendNotification => {
+          const existingDownloadState = existingDownloadStates.get(backendNotification.id);
+          if (existingDownloadState) {
+            return { ...backendNotification, downloadProgress: existingDownloadState };
+          }
+          return backendNotification;
+        });
+      });
       
       // Calculate unread count
       const count = data.filter(n => !n.read && !n.dismissed).length;
