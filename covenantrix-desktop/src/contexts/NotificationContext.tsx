@@ -19,32 +19,33 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
     notificationsRef.current = notifications;
   }, [notifications]);
 
-  // ✅ FIXED: Improved fetchNotifications with functional state updates
+  // ✅ FIXED: Capture download states directly from ref
   const fetchNotifications = useCallback(async () => {
     try {
       setIsLoading(true);
       
-      // Capture download states from CURRENT state using functional update
-      let activeDownloads = new Map();
-      
-      setNotifications(prev => {
-        prev.forEach(n => {
-          if (n.downloadProgress?.isDownloading) {
-            activeDownloads.set(n.id, n.downloadProgress);
-          }
-        });
-        return prev; // Don't update yet - just capture state
+      // ✅ Capture download states DIRECTLY from ref (always current)
+      const activeDownloads = new Map();
+      notificationsRef.current.forEach(n => {
+        if (n.downloadProgress?.isDownloading) {
+          activeDownloads.set(n.id, n.downloadProgress);
+          console.log('[fetchNotifications] Preserving download state for:', n.id, n.downloadProgress);
+        }
       });
       
       const data = await notificationService.getAll();
       
       // Restore download states to fetched data
-      setNotifications(data.map(backendNotification => {
+      const restoredData = data.map(backendNotification => {
         const activeDownload = activeDownloads.get(backendNotification.id);
-        return activeDownload 
-          ? { ...backendNotification, downloadProgress: activeDownload }
-          : backendNotification;
-      }));
+        if (activeDownload) {
+          console.log('[fetchNotifications] Restoring download state to:', backendNotification.id);
+          return { ...backendNotification, downloadProgress: activeDownload };
+        }
+        return backendNotification;
+      });
+      
+      setNotifications(restoredData);
       
       // Calculate unread count
       const count = data.filter(n => !n.read && !n.dismissed).length;
