@@ -4,6 +4,14 @@ export interface NotificationAction {
   url?: string;
 }
 
+// ✅ NEW: Separate type for download progress (transient state)
+export interface DownloadProgress {
+  percent: number;
+  transferred: number;
+  total: number;
+  isDownloading: boolean;
+}
+
 export interface Notification {
   id: string;
   type: string;
@@ -16,13 +24,8 @@ export interface Notification {
   read: boolean;
   dismissed: boolean;
   metadata?: Record<string, any>;
-  // Download progress tracking (for update notifications)
-  downloadProgress?: {
-    percent: number;
-    transferred: number;
-    total: number;
-    isDownloading: boolean;
-  };
+  // ✅ Download progress tracking (ephemeral, added by frontend only)
+  downloadProgress?: DownloadProgress;
 }
 
 export interface NotificationContextValue {
@@ -36,4 +39,3 @@ export interface NotificationContextValue {
   toggleExpanded: (id: string) => void;
   handleAction: (notificationId: string, action: string) => Promise<void>;
 }
-

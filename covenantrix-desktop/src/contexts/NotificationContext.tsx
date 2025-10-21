@@ -1,51 +1,35 @@
-import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
-import { Notification, NotificationContextValue } from '../types/notification';
+import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
+import { Notification, NotificationContextValue, DownloadProgress } from '../types/notification';
 import { notificationService } from '../services/api/notificationService';
 import { isElectron, envLog, envWarn } from '../utils/environment';
 
 const NotificationContext = createContext<NotificationContextValue | undefined>(undefined);
 
 export function NotificationProvider({ children }: { children: React.ReactNode }) {
+  // ✅ ARCHITECTURAL FIX: Separate persistent and transient state
   const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [downloadStates, setDownloadStates] = useState<Map<string, DownloadProgress>>(new Map());
+  
   const [unreadCount, setUnreadCount] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
   const [expandedNotifications, setExpandedNotifications] = useState<Set<string>>(new Set());
 
-  // ✅ NEW: Ref to hold current notifications for interval checks
-  const notificationsRef = useRef<Notification[]>([]);
-  
-  // Update ref whenever notifications change
-  useEffect(() => {
-    notificationsRef.current = notifications;
-  }, [notifications]);
+  // ✅ Combine notifications with download states for rendering
+  const notificationsWithProgress = useMemo(() => {
+    return notifications.map(n => {
+      const downloadProgress = downloadStates.get(n.id);
+      return downloadProgress ? { ...n, downloadProgress } : n;
+    });
+  }, [notifications, downloadStates]);
 
-  // ✅ FIXED: Capture download states directly from ref
+  // ✅ SIMPLIFIED: No more preservation logic needed
   const fetchNotifications = useCallback(async () => {
     try {
       setIsLoading(true);
-      
-      // ✅ Capture download states DIRECTLY from ref (always current)
-      const activeDownloads = new Map();
-      notificationsRef.current.forEach(n => {
-        if (n.downloadProgress?.isDownloading) {
-          activeDownloads.set(n.id, n.downloadProgress);
-          console.log('[fetchNotifications] Preserving download state for:', n.id, n.downloadProgress);
-        }
-      });
-      
       const data = await notificationService.getAll();
       
-      // Restore download states to fetched data
-      const restoredData = data.map(backendNotification => {
-        const activeDownload = activeDownloads.get(backendNotification.id);
-        if (activeDownload) {
-          console.log('[fetchNotifications] Restoring download state to:', backendNotification.id);
-          return { ...backendNotification, downloadProgress: activeDownload };
-        }
-        return backendNotification;
-      });
-      
-      setNotifications(restoredData);
+      // Just set notifications - download states are separate
+      setNotifications(data);
       
       // Calculate unread count
       const count = data.filter(n => !n.read && !n.dismissed).length;
@@ -55,7 +39,7 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
     } finally {
       setIsLoading(false);
     }
-  }, []); // ✅ Empty dependency array - correct
+  }, []);
 
   const markAsRead = useCallback(async (id: string) => {
     try {
@@ -77,6 +61,13 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
       
       // Remove from local state
       setNotifications(prev => prev.filter(n => n.id !== id));
+      
+      // Clean up download state if exists
+      setDownloadStates(prev => {
+        const next = new Map(prev);
+        next.delete(id);
+        return next;
+      });
       
       // Update unread count if notification was unread
       const notification = notifications.find(n => n.id === id);
@@ -123,33 +114,20 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
             
             if (!result.success) {
               console.error('[NotificationContext] Download failed:', result.error);
-              // TODO: Show error to user
               return;
             }
             
-            // Keep notification open and mark as downloading
-            console.log('[NotificationContext] Setting notification as downloading:', notificationId);
-            setNotifications(prev => 
-              prev.map(n => {
-                if (n.id === notificationId) {
-                  console.log('[NotificationContext] Updating notification to downloading state:', {
-                    notificationId: n.id,
-                    type: n.type,
-                    wasDownloading: n.downloadProgress?.isDownloading
-                  });
-                  return {
-                    ...n,
-                    downloadProgress: {
-                      percent: 0,
-                      transferred: 0,
-                      total: 0,
-                      isDownloading: true
-                    }
-                  };
-                }
-                return n;
-              })
-            );
+            // ✅ Set download state separately
+            setDownloadStates(prev => {
+              const next = new Map(prev);
+              next.set(notificationId, {
+                percent: 0,
+                transferred: 0,
+                total: 0,
+                isDownloading: true
+              });
+              return next;
+            });
             
             // Keep notification expanded to show progress
             setExpandedNotifications(prev => {
@@ -159,7 +137,6 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
             });
           } catch (error) {
             console.error('[NotificationContext] Download exception:', error);
-            // TODO: Show error to user
           }
           break;
 
@@ -189,7 +166,7 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
     }
   }, [dismissNotification, markAsRead]);
 
-  // ✅ FIXED: Auto-refresh with ref-based download check
+  // ✅ SIMPLIFIED: Auto-refresh just works
   useEffect(() => {
     if (!isElectron()) {
       envLog('NotificationContext: Skipping auto-refresh in browser mode');
@@ -197,22 +174,9 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
     }
     
     fetchNotifications();
-    
-    const interval = setInterval(() => {
-      // Check from ref - always current, no stale closure
-      const hasActiveDownload = notificationsRef.current.some(
-        n => n.downloadProgress?.isDownloading
-      );
-      
-      if (!hasActiveDownload) {
-        fetchNotifications();
-      } else {
-        console.log('[NotificationContext] Skipping auto-refresh - download in progress');
-      }
-    }, 60000);
-    
+    const interval = setInterval(fetchNotifications, 60000);
     return () => clearInterval(interval);
-  }, [fetchNotifications]); // ✅ Only fetchNotifications in dependencies
+  }, [fetchNotifications]);
 
   // Listen for update notification events from Electron
   useEffect(() => {
@@ -229,57 +193,51 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
 
     const cleanupUpdateReadyNotificationCreated = window.electronAPI.onUpdateReadyNotificationCreated(() => {
       envLog('Update ready notification created, refreshing notifications...');
-      // ✅ This naturally clears download state when update is ready
+      
+      // ✅ Clear download states when update is ready
+      setDownloadStates(prev => {
+        const next = new Map(prev);
+        // Clear all download states for version_update notifications
+        notifications.forEach(n => {
+          if (n.type === 'version_update') {
+            next.delete(n.id);
+          }
+        });
+        return next;
+      });
+      
       fetchNotifications();
     });
 
-    // Listen for update download progress
+    // ✅ SIMPLIFIED: Update download state directly
     const cleanupUpdateStatus = window.electronAPI.onUpdateStatus((updateData) => {
-      console.log('[NotificationContext] onUpdateStatus received:', updateData);
       const { status, data } = updateData;
       
       if (status === 'downloading' && data) {
         console.log('[NotificationContext] Processing download progress:', {
           percent: data.percent,
           transferred: data.transferred,
-          total: data.total,
-          status
+          total: data.total
         });
         
-        // Update the version_update notification with download progress
-        setNotifications(prev => {
-          const updated = prev.map(n => {
-            // Find the update notification (version_update type)
-            if (n.type === 'version_update' && n.downloadProgress?.isDownloading) {
-              console.log('[NotificationContext] Updating notification progress:', {
-                notificationId: n.id,
-                oldPercent: n.downloadProgress?.percent,
-                newPercent: data.percent,
-                oldTransferred: n.downloadProgress?.transferred,
-                newTransferred: data.transferred
-              });
-              
-              return {
-                ...n,
-                downloadProgress: {
-                  percent: data.percent || 0,
-                  transferred: data.transferred || 0,
-                  total: data.total || 0,
-                  isDownloading: true
-                }
-              };
-            }
-            return n;
+        // Find the downloading notification
+        const downloadingNotification = notifications.find(
+          n => n.type === 'version_update' && downloadStates.has(n.id)
+        );
+        
+        if (downloadingNotification) {
+          // Update download state
+          setDownloadStates(prev => {
+            const next = new Map(prev);
+            next.set(downloadingNotification.id, {
+              percent: data.percent || 0,
+              transferred: data.transferred || 0,
+              total: data.total || 0,
+              isDownloading: true
+            });
+            return next;
           });
-          
-          console.log('[NotificationContext] Notifications updated, found downloading notifications:', 
-            updated.filter(n => n.downloadProgress?.isDownloading).length
-          );
-          
-          return updated;
-        });
-      } else {
-        console.log('[NotificationContext] Ignoring update status:', { status, hasData: !!data });
+        }
       }
     });
 
@@ -289,10 +247,10 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
       cleanupUpdateReadyNotificationCreated();
       cleanupUpdateStatus();
     };
-  }, [fetchNotifications]);
+  }, [fetchNotifications, notifications, downloadStates]);
 
   const value: NotificationContextValue = {
-    notifications,
+    notifications: notificationsWithProgress, // ✅ Expose combined data
     unreadCount,
     isLoading,
     expandedNotifications,
