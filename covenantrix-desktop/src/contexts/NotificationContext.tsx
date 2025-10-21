@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { Notification, NotificationContextValue } from '../types/notification';
 import { notificationService } from '../services/api/notificationService';
 import { isElectron, envLog, envWarn } from '../utils/environment';
@@ -11,28 +11,40 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
   const [isLoading, setIsLoading] = useState(false);
   const [expandedNotifications, setExpandedNotifications] = useState<Set<string>>(new Set());
 
+  // ✅ NEW: Ref to hold current notifications for interval checks
+  const notificationsRef = useRef<Notification[]>([]);
+  
+  // Update ref whenever notifications change
+  useEffect(() => {
+    notificationsRef.current = notifications;
+  }, [notifications]);
+
+  // ✅ FIXED: Improved fetchNotifications with functional state updates
   const fetchNotifications = useCallback(async () => {
     try {
       setIsLoading(true);
-      const data = await notificationService.getAll();
       
-      // Preserve existing downloadProgress state
+      // Capture download states from CURRENT state using functional update
+      let activeDownloads = new Map();
+      
       setNotifications(prev => {
-        const existingDownloadStates = new Map();
         prev.forEach(n => {
           if (n.downloadProgress?.isDownloading) {
-            existingDownloadStates.set(n.id, n.downloadProgress);
+            activeDownloads.set(n.id, n.downloadProgress);
           }
         });
-        
-        return data.map(backendNotification => {
-          const existingDownloadState = existingDownloadStates.get(backendNotification.id);
-          if (existingDownloadState) {
-            return { ...backendNotification, downloadProgress: existingDownloadState };
-          }
-          return backendNotification;
-        });
+        return prev; // Don't update yet - just capture state
       });
+      
+      const data = await notificationService.getAll();
+      
+      // Restore download states to fetched data
+      setNotifications(data.map(backendNotification => {
+        const activeDownload = activeDownloads.get(backendNotification.id);
+        return activeDownload 
+          ? { ...backendNotification, downloadProgress: activeDownload }
+          : backendNotification;
+      }));
       
       // Calculate unread count
       const count = data.filter(n => !n.read && !n.dismissed).length;
@@ -42,7 +54,7 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, []); // ✅ Empty dependency array - correct
 
   const markAsRead = useCallback(async (id: string) => {
     try {
@@ -176,7 +188,7 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
     }
   }, [dismissNotification, markAsRead]);
 
-  // Auto-refresh every 60 seconds
+  // ✅ FIXED: Auto-refresh with ref-based download check
   useEffect(() => {
     if (!isElectron()) {
       envLog('NotificationContext: Skipping auto-refresh in browser mode');
@@ -184,9 +196,22 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
     }
     
     fetchNotifications();
-    const interval = setInterval(fetchNotifications, 60000);
+    
+    const interval = setInterval(() => {
+      // Check from ref - always current, no stale closure
+      const hasActiveDownload = notificationsRef.current.some(
+        n => n.downloadProgress?.isDownloading
+      );
+      
+      if (!hasActiveDownload) {
+        fetchNotifications();
+      } else {
+        console.log('[NotificationContext] Skipping auto-refresh - download in progress');
+      }
+    }, 60000);
+    
     return () => clearInterval(interval);
-  }, [fetchNotifications]);
+  }, [fetchNotifications]); // ✅ Only fetchNotifications in dependencies
 
   // Listen for update notification events from Electron
   useEffect(() => {
@@ -203,6 +228,7 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
 
     const cleanupUpdateReadyNotificationCreated = window.electronAPI.onUpdateReadyNotificationCreated(() => {
       envLog('Update ready notification created, refreshing notifications...');
+      // ✅ This naturally clears download state when update is ready
       fetchNotifications();
     });
 
@@ -290,4 +316,3 @@ export function useNotifications() {
   }
   return context;
 }
-
