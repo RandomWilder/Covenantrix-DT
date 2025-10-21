@@ -10,21 +10,10 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
   const [unreadCount, setUnreadCount] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
   const [expandedNotifications, setExpandedNotifications] = useState<Set<string>>(new Set());
-  const [hasActiveDownloads, setHasActiveDownloads] = useState(false);
 
   const fetchNotifications = useCallback(async () => {
     try {
       setIsLoading(true);
-      
-      // Check if any downloads are active
-      const hasActiveDownloads = notifications.some(n => n.downloadProgress?.isDownloading);
-      
-      if (hasActiveDownloads) {
-        // Skip backend fetch during active downloads
-        console.log('[NotificationContext] Skipping fetch during active download');
-        return;
-      }
-      
       const data = await notificationService.getAll();
       
       // Preserve existing downloadProgress state
@@ -53,7 +42,7 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
     } finally {
       setIsLoading(false);
     }
-  }, [notifications]); // Add notifications dependency
+  }, []);
 
   const markAsRead = useCallback(async (id: string) => {
     try {
@@ -187,28 +176,17 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
     }
   }, [dismissNotification, markAsRead]);
 
-  // Update download state tracking
-  useEffect(() => {
-    const activeDownloads = notifications.some(n => n.downloadProgress?.isDownloading);
-    setHasActiveDownloads(activeDownloads);
-  }, [notifications]);
-
-  // Auto-refresh every 60 seconds (only when no active downloads)
+  // Auto-refresh every 60 seconds
   useEffect(() => {
     if (!isElectron()) {
       envLog('NotificationContext: Skipping auto-refresh in browser mode');
       return;
     }
     
-    if (hasActiveDownloads) {
-      console.log('[NotificationContext] Pausing notification polling during download');
-      return;
-    }
-    
     fetchNotifications();
     const interval = setInterval(fetchNotifications, 60000);
     return () => clearInterval(interval);
-  }, [fetchNotifications, hasActiveDownloads]);
+  }, [fetchNotifications]);
 
   // Listen for update notification events from Electron
   useEffect(() => {
