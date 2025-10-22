@@ -108,16 +108,7 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
           console.log('[NotificationContext] Download update triggered', { notificationId });
           
           try {
-            // Trigger update download via IPC
-            const result = await window.electronAPI.update.download();
-            console.log('[NotificationContext] Download initiated', result);
-            
-            if (!result.success) {
-              console.error('[NotificationContext] Download failed:', result.error);
-              return;
-            }
-            
-            // ✅ Set download state separately
+            // ✅ CRITICAL FIX: Set download state BEFORE triggering download
             setDownloadStates(prev => {
               const next = new Map(prev);
               next.set(notificationId, {
@@ -126,6 +117,7 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
                 total: 0,
                 isDownloading: true
               });
+              console.log('[NotificationContext] Download state set for notification:', notificationId);
               return next;
             });
             
@@ -135,8 +127,29 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
               newSet.add(notificationId);
               return newSet;
             });
+            
+            // Now trigger the download
+            const result = await window.electronAPI.update.download();
+            console.log('[NotificationContext] Download initiated', result);
+            
+            if (!result.success) {
+              console.error('[NotificationContext] Download failed:', result.error);
+              // Clear download state on failure
+              setDownloadStates(prev => {
+                const next = new Map(prev);
+                next.delete(notificationId);
+                return next;
+              });
+              return;
+            }
           } catch (error) {
             console.error('[NotificationContext] Download exception:', error);
+            // Clear download state on error
+            setDownloadStates(prev => {
+              const next = new Map(prev);
+              next.delete(notificationId);
+              return next;
+            });
           }
           break;
 
@@ -221,12 +234,13 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
           total: data.total
         });
         
-        // Find the downloading notification
+        // Find the downloading notification by checking if it exists in downloadStates
         const downloadingNotification = notifications.find(
           n => n.type === 'version_update' && downloadStates.has(n.id)
         );
         
         if (downloadingNotification) {
+          console.log('[NotificationContext] Updating progress for notification:', downloadingNotification.id);
           // Update download state
           setDownloadStates(prev => {
             const next = new Map(prev);
@@ -238,10 +252,12 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
             });
             return next;
           });
+        } else {
+          console.warn('[NotificationContext] No downloading notification found in downloadStates');
         }
       }
       
-      // ✅ NEW: Handle download completion
+      // ✅ Handle download completion
       if (status === 'Update downloaded') {
         console.log('[NotificationContext] Download completed, clearing download states');
         
@@ -252,7 +268,7 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
         fetchNotifications();
       }
       
-      // ✅ NEW: Handle update ready notification created
+      // ✅ Handle update ready notification created
       if (status === 'update-ready-notification-created') {
         console.log('[NotificationContext] Update ready notification created, clearing download states');
         
