@@ -30,7 +30,7 @@ const StatusBar: React.FC<StatusBarProps> = ({ onProfileClick }) => {
           <span>{currentTime}</span>
         </div>
         <div className="text-xs">
-          Covenantrix v1.1.42
+          Covenantrix v1.1.43
         </div>
         <button
           onClick={onProfileClick}
