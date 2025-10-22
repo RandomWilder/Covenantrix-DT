@@ -209,10 +209,11 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
       fetchNotifications();
     });
 
-    // ✅ SIMPLIFIED: Update download state directly
+    // ✅ FIXED: Handle all update status events including completion
     const cleanupUpdateStatus = window.electronAPI.onUpdateStatus((updateData) => {
       const { status, data } = updateData;
       
+      // Handle download progress updates
       if (status === 'downloading' && data) {
         console.log('[NotificationContext] Processing download progress:', {
           percent: data.percent,
@@ -238,6 +239,28 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
             return next;
           });
         }
+      }
+      
+      // ✅ NEW: Handle download completion
+      if (status === 'Update downloaded') {
+        console.log('[NotificationContext] Download completed, clearing download states');
+        
+        // Clear all download states
+        setDownloadStates(new Map());
+        
+        // Refresh notifications to get the "Update Ready" notification
+        fetchNotifications();
+      }
+      
+      // ✅ NEW: Handle update ready notification created
+      if (status === 'update-ready-notification-created') {
+        console.log('[NotificationContext] Update ready notification created, clearing download states');
+        
+        // Clear all download states
+        setDownloadStates(new Map());
+        
+        // Refresh notifications
+        fetchNotifications();
       }
     });
 
