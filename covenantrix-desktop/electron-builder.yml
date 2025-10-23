@@ -69,7 +69,7 @@ mac:
   category: public.app-category.productivity
   hardenedRuntime: true
   gatekeeperAssess: false
-  entitlements: build/entitlements.mac.plist
+  entitlements: entitlements.mac.plist
   # entitlementsInherit not set - allows child binaries to be signed without strict entitlements
   # This is critical for embedded Python distributions with .pyc, .so files
   notarize: true
