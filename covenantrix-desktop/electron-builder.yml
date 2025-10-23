@@ -67,9 +67,11 @@ mac:
         - arm64
   icon: public/icons/icon.icns
   category: public.app-category.productivity
-  hardenedRuntime: false
+  hardenedRuntime: true
   gatekeeperAssess: false
-  identity: null
+  entitlements: build/entitlements.mac.plist
+  entitlementsInherit: build/entitlements.mac.plist
+  notarize: true
   artifactName: ${productName}-${version}-${arch}.${ext}
   
 dmg:
@@ -80,7 +82,6 @@ dmg:
       y: 220
       type: link
       path: /Applications
-  sign: false
   window:
     width: 540
     height: 380
