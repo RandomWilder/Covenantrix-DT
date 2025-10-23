@@ -69,9 +69,8 @@ mac:
   category: public.app-category.productivity
   hardenedRuntime: true
   gatekeeperAssess: false
-  entitlements: entitlements.mac.plist
-  # entitlementsInherit not set - allows child binaries to be signed without strict entitlements
-  # This is critical for embedded Python distributions with .pyc, .so files
+  # No entitlements file specified - electron-builder will use default signing
+  # This is the recommended approach for apps with embedded Python distributions
   notarize: true
   artifactName: ${productName}-${version}-${arch}.${ext}
   
