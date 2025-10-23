@@ -2,6 +2,7 @@ appId: com.covenantrix.desktop
 productName: Covenantrix
 copyright: Copyright © 2025 ${author}
 
+# CRITICAL: Proper file inclusion/exclusion
 files:
   - dist/**/*
   - electron/**/*
@@ -18,12 +19,15 @@ files:
   - "!**/{.git,.gitignore,.gitattributes}"
   - "!**/{.DS_Store,Thumbs.db}"
 
+# Use asar for better compression
 asar: true
+# extraResources are automatically unpacked, no need for asarUnpack
 
 directories:
   buildResources: build
   output: dist/release
 
+# Compression for smaller installers
 compression: maximum
 
 # ============================================
@@ -36,7 +40,6 @@ win:
         - x64
   icon: public/icons/icon.ico
   artifactName: ${productName}-Setup-${version}.${ext}
-  sign: null
   
 nsis:
   oneClick: false
@@ -64,11 +67,9 @@ mac:
         - arm64
   icon: public/icons/icon.icns
   category: public.app-category.productivity
-  hardenedRuntime: true
+  hardenedRuntime: false
   gatekeeperAssess: false
-  entitlements: entitlements.mac.plist
-  entitlementsInherit: entitlements.mac.plist
-  notarize: true
+  identity: null
   artifactName: ${productName}-${version}-${arch}.${ext}
   
 dmg:
@@ -79,12 +80,13 @@ dmg:
       y: 220
       type: link
       path: /Applications
+  sign: false
   window:
     width: 540
     height: 380
 
 # ============================================
-# LINUX CONFIGURATION
+# LINUX CONFIGURATION (Optional)
 # ============================================
 linux:
   target:
