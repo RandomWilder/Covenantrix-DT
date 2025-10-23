@@ -213,6 +213,37 @@ jobs:
           EOF
           echo "Production .env file created successfully"
       
+      # === MACOS CODE SIGNING SETUP ===
+      
+      - name: Setup macOS Code Signing
+        if: matrix.os == 'macos-latest'
+        shell: bash
+        run: |
+          echo "Setting up macOS Code Signing..."
+          
+          # Create temporary keychain
+          KEYCHAIN_PATH=$RUNNER_TEMP/build.keychain
+          KEYCHAIN_PASSWORD=$(openssl rand -base64 32)
+          
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          
+          # Import certificate
+          CERTIFICATE_PATH=$RUNNER_TEMP/certificate.p12
+          echo "${{ secrets.CSC_LINK }}" | base64 --decode > "$CERTIFICATE_PATH"
+          
+          security import "$CERTIFICATE_PATH" \
+            -k "$KEYCHAIN_PATH" \
+            -P "${{ secrets.CSC_KEY_PASSWORD }}" \
+            -T /usr/bin/codesign
+          
+          security list-keychains -d user -s "$KEYCHAIN_PATH" $(security list-keychains -d user | sed s/\"//g)
+          
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          
+          echo "✅ Code signing ready"
+      
       # === BUILD ELECTRON ===
       
       - name: Build Electron App
@@ -220,6 +251,11 @@ jobs:
         run: npm run package:${{ matrix.platform }}
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CSC_LINK: ${{ secrets.CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
           
       - name: List Build Output
         shell: bash
