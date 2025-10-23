@@ -70,7 +70,8 @@ mac:
   hardenedRuntime: true
   gatekeeperAssess: false
   entitlements: build/entitlements.mac.plist
-  entitlementsInherit: build/entitlements.mac.plist
+  # entitlementsInherit not set - allows child binaries to be signed without strict entitlements
+  # This is critical for embedded Python distributions with .pyc, .so files
   notarize: true
   artifactName: ${productName}-${version}-${arch}.${ext}
   
