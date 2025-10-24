@@ -35,7 +35,24 @@ But `@electron/notarize` and `xcrun notarytool` expect different variable names 
 
 ## The Fix
 
-### 1. Corrected Environment Variable Names
+### 1. Fixed electron-builder Configuration
+
+**Changed the notarize configuration in `electron-builder.yml`:**
+
+From:
+```yaml
+notarize:
+  teamId: ${APPLE_TEAM_ID}
+```
+
+To:
+```yaml
+notarize: true
+```
+
+**Why this matters**: The `${APPLE_TEAM_ID}` interpolation syntax wasn't working correctly in electron-builder's YAML parser. Using `notarize: true` tells electron-builder to automatically read the environment variables directly.
+
+### 2. Corrected Environment Variable Names
 
 Changed from using only `APPLE_APP_SPECIFIC_PASSWORD` to setting **all possible variable names** for maximum compatibility:
 
@@ -54,7 +71,7 @@ This ensures compatibility with:
 - `xcrun notarytool` (direct Apple CLI)
 - Various electron-builder versions
 
-### 2. Simplified the Workflow
+### 3. Simplified the Workflow
 
 **Removed**:
 - Complex credential validation step (40+ lines → 6 lines)
@@ -65,7 +82,7 @@ This ensures compatibility with:
 - Debug step that runs on failure to test credentials directly with `xcrun notarytool history`
 - Clear, concise credential verification
 
-### 3. Better Error Handling
+### 4. Better Error Handling
 
 Added a debug step that only runs if the build fails:
 ```yaml
@@ -76,6 +93,13 @@ Added a debug step that only runs if the build fails:
 ```
 
 This will show the **actual HTTP error** from Apple if credentials are still invalid.
+
+**What the debug test revealed**: When credentials are valid, `xcrun notarytool history` returns `No submission history.` instead of an HTTP error. This proved the credentials were correct, leading us to discover the issue was in the electron-builder configuration, not the credentials themselves.
+
+## Configuration Files Modified
+
+- `.github/workflows/build.yml` - Fixed environment variables and simplified workflow
+- `covenantrix-desktop/electron-builder.yml` - Changed `notarize: { teamId: ${APPLE_TEAM_ID} }` to `notarize: true`
 
 ## Required GitHub Secrets
 
@@ -121,13 +145,9 @@ If notarization still fails, the new "Debug Notarization Failure" step will show
 ### After (Simple & Correct):
 - 15 lines of credential verification
 - All compatible variable names set
+- electron-builder config using `notarize: true`
 - Clear success/failure indicators
 - Direct error reporting from Apple
-
-## Configuration Files Modified
-
-- `.github/workflows/build.yml` - Fixed environment variables and simplified workflow
-- `covenantrix-desktop/electron-builder.yml` - No changes needed (already correct)
 
 ## Next Steps
 
@@ -138,5 +158,9 @@ If notarization still fails, the new "Debug Notarization Failure" step will show
 
 ---
 
-**Key Takeaway**: The issue wasn't with the credentials themselves, but with how they were being passed to the notarization tool. Simple naming convention fix!
+**Key Takeaway**: The issue had two parts:
+1. Wrong environment variable names in the workflow (fixed by using `APPLE_ID_PASSWORD` instead of `APPLE_APP_SPECIFIC_PASSWORD`)
+2. Broken YAML interpolation in electron-builder config (fixed by changing `notarize: { teamId: ${APPLE_TEAM_ID} }` to `notarize: true`)
+
+The credentials were valid all along - they just weren't being passed correctly!
 
