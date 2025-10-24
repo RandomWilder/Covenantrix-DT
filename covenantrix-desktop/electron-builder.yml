@@ -71,7 +71,8 @@ mac:
   gatekeeperAssess: false
   # No entitlements file specified - electron-builder will use default signing
   # This is the recommended approach for apps with embedded Python distributions
-  notarize: true
+  notarize:
+    teamId: ${APPLE_TEAM_ID}
   artifactName: ${productName}-${version}-${arch}.${ext}
   
 dmg:
