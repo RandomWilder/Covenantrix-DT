@@ -71,9 +71,11 @@ mac:
   gatekeeperAssess: false
   # No entitlements file specified - electron-builder will use default signing
   # This is the recommended approach for apps with embedded Python distributions
-  # Notarization requires explicit teamId configuration for password-based auth
+  # Notarization with explicit credentials (required for password-based auth)
   notarize:
     teamId: ${APPLE_TEAM_ID}
+    appleId: ${APPLE_ID}
+    appleIdPassword: ${APPLE_APP_SPECIFIC_PASSWORD}
   artifactName: ${productName}-${version}-${arch}.${ext}
   
 dmg:

@@ -223,9 +223,34 @@ jobs:
           [ -z "$CSC_LINK" ] && echo "❌ CSC_LINK is empty" || echo "✅ CSC_LINK is set"
           [ -z "$CSC_KEY_PASSWORD" ] && echo "❌ CSC_KEY_PASSWORD is empty" || echo "✅ CSC_KEY_PASSWORD is set"
           [ -z "$APPLE_ID" ] && echo "❌ APPLE_ID is empty" || echo "✅ APPLE_ID is set (value: $APPLE_ID)"
-          [ -z "$APPLE_APP_SPECIFIC_PASSWORD" ] && echo "❌ APPLE_APP_SPECIFIC_PASSWORD is empty" || echo "✅ APPLE_APP_SPECIFIC_PASSWORD is set"
+          [ -z "$APPLE_APP_SPECIFIC_PASSWORD" ] && echo "❌ APPLE_APP_SPECIFIC_PASSWORD is empty" || echo "✅ APPLE_APP_SPECIFIC_PASSWORD is set (length: ${#APPLE_APP_SPECIFIC_PASSWORD})"
           [ -z "$APPLE_TEAM_ID" ] && echo "❌ APPLE_TEAM_ID is empty" || echo "✅ APPLE_TEAM_ID is set (value: $APPLE_TEAM_ID)"
           [ -z "$TEAM_ID" ] && echo "❌ TEAM_ID is empty" || echo "✅ TEAM_ID is set (value: $TEAM_ID)"
+          
+          echo ""
+          echo "🔍 Validating credential format..."
+          
+          # Check APPLE_ID format (should be an email)
+          if [[ "$APPLE_ID" =~ ^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$ ]]; then
+            echo "✅ APPLE_ID has valid email format"
+          else
+            echo "⚠️  APPLE_ID might not be a valid email"
+          fi
+          
+          # Check APPLE_TEAM_ID format (should be 10 characters, alphanumeric)
+          if [[ "$APPLE_TEAM_ID" =~ ^[A-Z0-9]{10}$ ]]; then
+            echo "✅ APPLE_TEAM_ID has valid format (10 alphanumeric chars)"
+          else
+            echo "⚠️  APPLE_TEAM_ID format might be incorrect (expected: 10 alphanumeric chars)"
+          fi
+          
+          # Check APPLE_APP_SPECIFIC_PASSWORD format (should be 16 chars with hyphens in format: xxxx-xxxx-xxxx-xxxx)
+          if [[ "$APPLE_APP_SPECIFIC_PASSWORD" =~ ^[a-z]{4}-[a-z]{4}-[a-z]{4}-[a-z]{4}$ ]]; then
+            echo "✅ APPLE_APP_SPECIFIC_PASSWORD has valid format (xxxx-xxxx-xxxx-xxxx)"
+          else
+            echo "⚠️  APPLE_APP_SPECIFIC_PASSWORD format might be incorrect (expected: xxxx-xxxx-xxxx-xxxx)"
+            echo "   Length: ${#APPLE_APP_SPECIFIC_PASSWORD} chars (expected: 19)"
+          fi
         env:
           CSC_LINK: ${{ secrets.CSC_LINK }}
           CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
