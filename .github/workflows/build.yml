@@ -215,6 +215,25 @@ jobs:
       
       # === BUILD ELECTRON ===
       
+      - name: Verify macOS Signing Secrets (macOS only)
+        if: matrix.os == 'macos-latest'
+        shell: bash
+        run: |
+          echo "Checking macOS signing environment variables..."
+          [ -z "$CSC_LINK" ] && echo "❌ CSC_LINK is empty" || echo "✅ CSC_LINK is set"
+          [ -z "$CSC_KEY_PASSWORD" ] && echo "❌ CSC_KEY_PASSWORD is empty" || echo "✅ CSC_KEY_PASSWORD is set"
+          [ -z "$APPLE_ID" ] && echo "❌ APPLE_ID is empty" || echo "✅ APPLE_ID is set (value: $APPLE_ID)"
+          [ -z "$APPLE_APP_SPECIFIC_PASSWORD" ] && echo "❌ APPLE_APP_SPECIFIC_PASSWORD is empty" || echo "✅ APPLE_APP_SPECIFIC_PASSWORD is set"
+          [ -z "$APPLE_TEAM_ID" ] && echo "❌ APPLE_TEAM_ID is empty" || echo "✅ APPLE_TEAM_ID is set (value: $APPLE_TEAM_ID)"
+          [ -z "$TEAM_ID" ] && echo "❌ TEAM_ID is empty" || echo "✅ TEAM_ID is set (value: $TEAM_ID)"
+        env:
+          CSC_LINK: ${{ secrets.CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+      
       - name: Build Electron App
         working-directory: covenantrix-desktop
         run: npm run package:${{ matrix.platform }}
@@ -225,7 +244,9 @@ jobs:
           CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
-          APPLE_TEAM_ID: ${{ secrets.TEAM_ID }}
+          # Set both variable names for compatibility with different notarize versions
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
           
       - name: List Build Output
         shell: bash
