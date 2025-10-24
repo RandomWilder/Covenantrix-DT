@@ -39,18 +39,30 @@ But `@electron/notarize` and `xcrun notarytool` expect different variable names 
 
 **Changed the notarize configuration in `electron-builder.yml`:**
 
-From:
+**Evolution of attempts:**
+
+1st attempt (Failed):
 ```yaml
 notarize:
-  teamId: ${APPLE_TEAM_ID}
+  teamId: ${APPLE_TEAM_ID}  # ❌ YAML interpolation doesn't work
 ```
 
-To:
+2nd attempt (Failed):
 ```yaml
-notarize: true
+notarize: true  # ❌ electron-builder doesn't auto-detect teamId
 ```
 
-**Why this matters**: The `${APPLE_TEAM_ID}` interpolation syntax wasn't working correctly in electron-builder's YAML parser. Using `notarize: true` tells electron-builder to automatically read the environment variables directly.
+Final solution (Works):
+```yaml
+notarize:
+  teamId: "2FN24V2Y82"  # ✅ Explicit teamId configuration
+```
+
+**Why this is necessary**: 
+- `@electron/notarize` requires three parameters: `appleId`, `appleIdPassword`, and `teamId`
+- electron-builder auto-detects `appleId` and `appleIdPassword` from environment variables
+- But `teamId` must be explicitly configured in the YAML
+- Team IDs are not secrets (they're visible in certificates and public app listings)
 
 ### 2. Corrected Environment Variable Names
 
@@ -158,9 +170,12 @@ If notarization still fails, the new "Debug Notarization Failure" step will show
 
 ---
 
-**Key Takeaway**: The issue had two parts:
-1. Wrong environment variable names in the workflow (fixed by using `APPLE_ID_PASSWORD` instead of `APPLE_APP_SPECIFIC_PASSWORD`)
-2. Broken YAML interpolation in electron-builder config (fixed by changing `notarize: { teamId: ${APPLE_TEAM_ID} }` to `notarize: true`)
+**Key Takeaway**: The issue had three parts:
+1. **Wrong environment variable names** in the workflow → Fixed by using `APPLE_ID_PASSWORD` instead of only `APPLE_APP_SPECIFIC_PASSWORD`
+2. **Broken YAML interpolation** → `${APPLE_TEAM_ID}` syntax doesn't work in electron-builder.yml
+3. **Missing explicit teamId configuration** → electron-builder doesn't auto-detect `APPLE_TEAM_ID` env var for the `teamId` parameter
 
-The credentials were valid all along - they just weren't being passed correctly!
+**Final solution:** Explicitly hardcode `teamId: "2FN24V2Y82"` in electron-builder.yml (Team IDs are not secrets).
+
+The credentials were valid all along - the issue was configuration syntax!
 

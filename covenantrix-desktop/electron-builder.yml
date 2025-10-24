@@ -89,9 +89,11 @@ mac:
   category: public.app-category.productivity
   hardenedRuntime: true
   gatekeeperAssess: false
-  # Notarization enabled - electron-builder will use environment variables:
-  # APPLE_ID, APPLE_ID_PASSWORD (or APPLE_PASSWORD), and APPLE_TEAM_ID
-  notarize: true
+  # Notarization configuration
+  # electron-builder will read APPLE_ID and APPLE_ID_PASSWORD from environment
+  # teamId must be explicitly configured (not a secret - visible in certificates)
+  notarize:
+    teamId: "2FN24V2Y82"
   artifactName: ${productName}-${version}-${arch}.${ext}
   
 dmg:
