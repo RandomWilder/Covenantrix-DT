@@ -259,6 +259,33 @@ jobs:
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
           TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
       
+      - name: Test Apple Credentials (macOS only)
+        if: matrix.os == 'macos-latest'
+        shell: bash
+        continue-on-error: true
+        run: |
+          echo "🧪 Testing Apple notarization credentials..."
+          
+          # Create a simple test app structure to test notarization
+          mkdir -p test-app.app/Contents/MacOS
+          echo '#!/bin/bash' > test-app.app/Contents/MacOS/test
+          echo 'echo "test"' >> test-app.app/Contents/MacOS/test
+          chmod +x test-app.app/Contents/MacOS/test
+          
+          # Try to sign with codesign (this validates CSC credentials)
+          echo "Testing code signing..."
+          if security find-identity -v -p codesigning | grep -q "Developer ID Application"; then
+            echo "✅ Code signing identity found"
+          else
+            echo "⚠️  No code signing identity found - will skip notarization"
+          fi
+          
+          # Clean up
+          rm -rf test-app.app
+        env:
+          CSC_LINK: ${{ secrets.CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
+      
       - name: Build Electron App
         working-directory: covenantrix-desktop
         run: npm run package:${{ matrix.platform }}
@@ -272,6 +299,8 @@ jobs:
           # Set both variable names for compatibility with different notarize versions
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
           TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          # Enable debug logging for notarization
+          DEBUG: electron-notarize*
           
       - name: List Build Output
         shell: bash

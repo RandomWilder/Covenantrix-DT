@@ -59,6 +59,26 @@ nsis:
 # ============================================
 # MACOS CONFIGURATION
 # ============================================
+# IMPORTANT: macOS Code Signing & Notarization Requirements
+# 
+# Required GitHub Secrets:
+#   1. CSC_LINK: Base64 of Developer ID Application certificate (.p12)
+#   2. CSC_KEY_PASSWORD: Password for the .p12 certificate
+#   3. APPLE_ID: Your Apple Developer account email
+#   4. APPLE_APP_PASSWORD: App-specific password from appleid.apple.com
+#   5. APPLE_TEAM_ID: 10-character Team ID (must match certificate)
+#
+# To verify your Team ID matches your certificate:
+#   openssl pkcs12 -in cert.p12 -nokeys -passin pass:PASSWORD | openssl x509 -noout -text | grep "OU="
+#
+# To generate App-Specific Password:
+#   1. Go to https://appleid.apple.com/account/manage
+#   2. Sign in > Security > App-Specific Passwords
+#   3. Generate new password (format: xxxx-xxxx-xxxx-xxxx)
+#
+# If notarization fails, set SKIP_NOTARIZATION=true in GitHub Actions
+# to build with code signing only (app will be signed but not notarized)
+#
 mac:
   target:
     - target: dmg
@@ -71,11 +91,10 @@ mac:
   gatekeeperAssess: false
   # No entitlements file specified - electron-builder will use default signing
   # This is the recommended approach for apps with embedded Python distributions
-  # Notarization with explicit credentials (required for password-based auth)
+  # Notarization requires explicit teamId configuration for password-based auth
+  # Set to false to skip notarization (sign only): notarize: false
   notarize:
     teamId: ${APPLE_TEAM_ID}
-    appleId: ${APPLE_ID}
-    appleIdPassword: ${APPLE_APP_SPECIFIC_PASSWORD}
   artifactName: ${productName}-${version}-${arch}.${ext}
   
 dmg:
