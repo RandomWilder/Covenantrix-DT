@@ -215,54 +215,14 @@ jobs:
       
       # === BUILD ELECTRON ===
       
-      - name: Verify macOS Signing Secrets (macOS only)
-        if: matrix.os == 'macos-latest'
-        shell: bash
-        run: |
-          echo "=== Verifying macOS Signing Secrets ==="
-          [ -z "$CSC_LINK" ] && echo "❌ CSC_LINK missing" || echo "✅ CSC_LINK set"
-          [ -z "$CSC_KEY_PASSWORD" ] && echo "❌ CSC_KEY_PASSWORD missing" || echo "✅ CSC_KEY_PASSWORD set"
-          [ -z "$APPLE_ID" ] && echo "❌ APPLE_ID missing" || echo "✅ APPLE_ID: $APPLE_ID"
-          [ -z "$APPLE_ID_PASSWORD" ] && echo "❌ APPLE_ID_PASSWORD missing" || echo "✅ APPLE_ID_PASSWORD set (${#APPLE_ID_PASSWORD} chars)"
-          [ -z "$APPLE_TEAM_ID" ] && echo "❌ APPLE_TEAM_ID missing" || echo "✅ APPLE_TEAM_ID: $APPLE_TEAM_ID"
-        env:
-          CSC_LINK: ${{ secrets.CSC_LINK }}
-          CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
-          APPLE_ID: ${{ secrets.APPLE_ID }}
-          APPLE_ID_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
-          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
-      
       - name: Build Electron App
         working-directory: covenantrix-desktop
         run: npm run package:${{ matrix.platform }}
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          # macOS Code Signing
+          # macOS Code Signing & Notarization
           CSC_LINK: ${{ secrets.CSC_LINK }}
           CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
-          # macOS Notarization - set all variable names for compatibility
-          APPLE_ID: ${{ secrets.APPLE_ID }}
-          APPLE_ID_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
-          APPLE_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
-          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
-          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
-          DEBUG: electron-notarize*
-      
-      - name: Debug Notarization Failure (macOS only)
-        if: failure() && matrix.os == 'macos-latest'
-        shell: bash
-        run: |
-          echo "=== Attempting Manual Notarization Test ==="
-          echo "Testing credentials directly with xcrun notarytool..."
-          
-          # Try to validate credentials
-          xcrun notarytool history --apple-id "$APPLE_ID" --password "$APPLE_ID_PASSWORD" --team-id "$APPLE_TEAM_ID" 2>&1 || true
-          
-          echo ""
-          echo "If you see 'Error: HTTP status code: 401' - credentials are invalid"
-          echo "If you see 'Error: HTTP status code: 403' - account/password issue"
-          echo "If you see history entries - credentials are VALID!"
-        env:
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_ID_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
