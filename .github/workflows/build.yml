@@ -215,7 +215,15 @@ jobs:
       
       # === BUILD ELECTRON ===
       
-      - name: Build Electron App
+      - name: Build Electron App (Windows)
+        if: matrix.os == 'windows-latest'
+        working-directory: covenantrix-desktop
+        run: npm run package:${{ matrix.platform }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Build Electron App (macOS)
+        if: matrix.os == 'macos-latest'
         working-directory: covenantrix-desktop
         run: npm run package:${{ matrix.platform }}
         env:
