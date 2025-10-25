@@ -158,12 +158,22 @@ jobs:
           
           echo "All imports successful"
       
-      - name: Install libmagic (macOS)
+      - name: Install and Bundle libmagic (macOS)
         if: matrix.os == 'macos-latest'
         run: |
           echo "Installing libmagic for file type detection..."
-          brew install libmagic || exit 1
-          echo "libmagic installed successfully"
+          brew install libmagic
+          
+          echo "Creating lib directory in dist..."
+          mkdir -p dist/lib
+          
+          echo "Copying libmagic libraries..."
+          cp /opt/homebrew/lib/libmagic.* dist/lib/ 2>/dev/null || cp /usr/local/lib/libmagic.* dist/lib/
+          
+          echo "Verifying libmagic files:"
+          ls -la dist/lib/
+          
+          echo "libmagic bundled successfully"
       
       - name: Test Backend
         shell: bash
@@ -318,6 +328,23 @@ jobs:
               echo "⚠️  WARNING: python3 executable not found"
             else
               echo "✓ python3 found"
+            fi
+          fi
+          
+          # Check libmagic directory (macOS specific)
+          if [ ! -d "/tmp/covenantrix-verify/Covenantrix.app/Contents/Resources/lib" ]; then
+            echo "❌ MISSING: lib directory not found (libmagic)"
+            ISSUES_FOUND=$((ISSUES_FOUND + 1))
+          else
+            echo "✓ lib directory found"
+            
+            # Check for libmagic files
+            if ! ls /tmp/covenantrix-verify/Covenantrix.app/Contents/Resources/lib/libmagic.* 1> /dev/null 2>&1; then
+              echo "❌ MISSING: libmagic files not found"
+              ISSUES_FOUND=$((ISSUES_FOUND + 1))
+            else
+              echo "✓ libmagic files found:"
+              ls -la /tmp/covenantrix-verify/Covenantrix.app/Contents/Resources/lib/libmagic.* || true
             fi
           fi
           

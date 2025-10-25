@@ -185,6 +185,23 @@ class BackendManager {
         BACKEND_MODE: 'desktop'
       };
 
+      // macOS-specific: Add PYTHONPATH and DYLD_LIBRARY_PATH
+      if (process.platform === 'darwin' && !isDev) {
+        const resourcesPath = process.resourcesPath;
+        const backendDir = path.join(resourcesPath, 'backend');
+        const libDir = path.join(resourcesPath, 'lib');
+        
+        env.PYTHONPATH = backendDir;
+        log.info(`[macOS] Set PYTHONPATH to: ${backendDir}`);
+        
+        if (fs.existsSync(libDir)) {
+          env.DYLD_LIBRARY_PATH = libDir;
+          log.info(`[macOS] Set DYLD_LIBRARY_PATH to: ${libDir}`);
+        } else {
+          log.warn(`[macOS] lib directory not found at: ${libDir}`);
+        }
+      }
+
       // Load .env file if it exists
       const envPath = path.join(cwd, '.env');
       if (fs.existsSync(envPath)) {
