@@ -2,6 +2,9 @@ appId: com.covenantrix.desktop
 productName: Covenantrix
 copyright: Copyright © 2025 ${author}
 
+# Hooks
+afterPack: ./afterPack.js
+
 # CRITICAL: Proper file inclusion/exclusion
 files:
   - dist/**/*
