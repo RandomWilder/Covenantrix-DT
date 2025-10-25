@@ -91,6 +91,9 @@ mac:
   gatekeeperAssess: false
   entitlements: build/entitlements.mac.plist
   entitlementsInherit: build/entitlements.mac.plist
+  signIgnore:
+    - ".*\\.pyc$"
+    - ".*/__pycache__/.*"
   # Notarization configuration
   # electron-builder will read APPLE_ID and APPLE_ID_PASSWORD from environment
   # teamId must be explicitly configured (not a secret - visible in certificates)
