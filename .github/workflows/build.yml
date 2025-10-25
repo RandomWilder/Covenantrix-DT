@@ -236,6 +236,73 @@ jobs:
           APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
           
+      - name: Verify DMG Contents (macOS)
+        if: matrix.os == 'macos-latest'
+        shell: bash
+        run: |
+          echo "=== Verifying macOS DMG Contents ==="
+          DMG_PATH=$(find covenantrix-desktop/dist/release -name "*.dmg" -type f | head -n 1)
+          
+          if [ -z "$DMG_PATH" ]; then
+            echo "ERROR: No DMG found"
+            exit 1
+          fi
+          
+          echo "Found DMG: $DMG_PATH"
+          
+          # Mount DMG
+          hdiutil attach "$DMG_PATH" -mountpoint /tmp/covenantrix-verify -readonly
+          
+          # Check critical paths
+          echo "Checking app structure..."
+          ls -la /tmp/covenantrix-verify/
+          
+          if [ ! -d "/tmp/covenantrix-verify/Covenantrix.app/Contents/Resources/backend" ]; then
+            echo "ERROR: Backend directory missing"
+            hdiutil detach /tmp/covenantrix-verify
+            exit 1
+          fi
+          
+          if [ ! -d "/tmp/covenantrix-verify/Covenantrix.app/Contents/Resources/python-dist" ]; then
+            echo "ERROR: Python distribution missing"
+            hdiutil detach /tmp/covenantrix-verify
+            exit 1
+          fi
+          
+          # Check Python executable
+          PYTHON_PATH="/tmp/covenantrix-verify/Covenantrix.app/Contents/Resources/python-dist/bin/python"
+          if [ ! -f "$PYTHON_PATH" ]; then
+            echo "ERROR: Python executable missing at $PYTHON_PATH"
+            hdiutil detach /tmp/covenantrix-verify
+            exit 1
+          fi
+          
+          # Check if Python is executable
+          if [ ! -x "$PYTHON_PATH" ]; then
+            echo "WARNING: Python is not executable"
+          else
+            echo "✓ Python executable has correct permissions"
+          fi
+          
+          # Check backend main.py
+          if [ ! -f "/tmp/covenantrix-verify/Covenantrix.app/Contents/Resources/backend/main.py" ]; then
+            echo "ERROR: Backend main.py missing"
+            hdiutil detach /tmp/covenantrix-verify
+            exit 1
+          fi
+          
+          # Check .env file
+          if [ ! -f "/tmp/covenantrix-verify/Covenantrix.app/Contents/Resources/backend/.env" ]; then
+            echo "WARNING: Backend .env file missing"
+          else
+            echo "✓ Backend .env file present"
+          fi
+          
+          echo "✓ All critical paths verified"
+          
+          # Unmount
+          hdiutil detach /tmp/covenantrix-verify
+      
       - name: List Build Output
         shell: bash
         run: |
