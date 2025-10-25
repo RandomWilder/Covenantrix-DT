@@ -89,6 +89,8 @@ mac:
   category: public.app-category.productivity
   hardenedRuntime: true
   gatekeeperAssess: false
+  entitlements: build/entitlements.mac.plist
+  entitlementsInherit: build/entitlements.mac.plist
   # Notarization configuration
   # electron-builder will read APPLE_ID and APPLE_ID_PASSWORD from environment
   # teamId must be explicitly configured (not a secret - visible in certificates)
