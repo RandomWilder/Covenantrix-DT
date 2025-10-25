@@ -92,3 +92,7 @@ npm-debug.log*
 # OS
 Thumbs.db
 .DS_Store
+
+# EXCEPTION: Allow electron-builder build resources (entitlements, icons, etc.)
+!covenantrix-desktop/build/
+!covenantrix-desktop/build/**/*
