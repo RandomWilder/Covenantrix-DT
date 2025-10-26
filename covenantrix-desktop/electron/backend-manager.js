@@ -207,7 +207,7 @@ class BackendManager {
         if (fs.existsSync(magicDbPath)) {
           env.MAGIC = magicDbPath;
           log.info(`[macOS] Set MAGIC to: ${magicDbPath}`);
-        } else if (fs.existsExists(magicDbAlt)) {
+        } else if (fs.existsSync(magicDbAlt)) {
           env.MAGIC = magicDbAlt;
           log.info(`[macOS] Set MAGIC to: ${magicDbAlt}`);
         } else {
