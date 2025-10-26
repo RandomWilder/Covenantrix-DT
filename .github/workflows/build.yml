@@ -160,18 +160,42 @@ jobs:
       
       - name: Install and Bundle libmagic (macOS)
         if: matrix.os == 'macos-latest'
+        shell: bash
         run: |
           echo "Installing libmagic for file type detection..."
           brew install libmagic
           
-          echo "Creating lib directory in dist..."
+          echo "Creating directories..."
           mkdir -p dist/lib
+          mkdir -p dist/share/misc
           
           echo "Copying libmagic libraries..."
-          cp /opt/homebrew/lib/libmagic.* dist/lib/ 2>/dev/null || cp /usr/local/lib/libmagic.* dist/lib/
+          if [ -d "/opt/homebrew/lib" ]; then
+            cp /opt/homebrew/lib/libmagic.* dist/lib/ || exit 1
+            MAGIC_SRC="/opt/homebrew/share/misc"
+          else
+            cp /usr/local/lib/libmagic.* dist/lib/ || exit 1
+            MAGIC_SRC="/usr/local/share/misc"
+          fi
           
-          echo "Verifying libmagic files:"
-          ls -la dist/lib/
+          echo "Copying magic database files..."
+          if [ -f "$MAGIC_SRC/magic.mgc" ]; then
+            cp "$MAGIC_SRC/magic.mgc" dist/share/misc/ || exit 1
+            echo "Copied magic.mgc"
+          elif [ -f "$MAGIC_SRC/magic" ]; then
+            cp "$MAGIC_SRC/magic" dist/share/misc/ || exit 1
+            echo "Copied magic (uncompiled)"
+          else
+            echo "ERROR: Could not find magic database at $MAGIC_SRC"
+            exit 1
+          fi
+          
+          echo "Verifying bundled files:"
+          echo "Libraries:"
+          ls -lh dist/lib/libmagic.*
+          echo ""
+          echo "Magic database:"
+          ls -lh dist/share/misc/
           
           echo "libmagic bundled successfully"
       
@@ -345,6 +369,24 @@ jobs:
             else
               echo "✓ libmagic files found:"
               ls -la /tmp/covenantrix-verify/Covenantrix.app/Contents/Resources/lib/libmagic.* || true
+            fi
+          fi
+          
+          # Check magic database (CRITICAL FIX)
+          if [ ! -d "/tmp/covenantrix-verify/Covenantrix.app/Contents/Resources/share/misc" ]; then
+            echo "❌ MISSING: share/misc directory not found (magic database)"
+            ISSUES_FOUND=$((ISSUES_FOUND + 1))
+          else
+            echo "✓ share/misc directory found"
+            
+            # Check for magic database file
+            if [ ! -f "/tmp/covenantrix-verify/Covenantrix.app/Contents/Resources/share/misc/magic.mgc" ] && \
+               [ ! -f "/tmp/covenantrix-verify/Covenantrix.app/Contents/Resources/share/misc/magic" ]; then
+              echo "❌ MISSING: magic database file not found"
+              ISSUES_FOUND=$((ISSUES_FOUND + 1))
+            else
+              echo "✓ magic database found:"
+              ls -lh /tmp/covenantrix-verify/Covenantrix.app/Contents/Resources/share/misc/ || true
             fi
           fi
           

@@ -185,11 +185,13 @@ class BackendManager {
         BACKEND_MODE: 'desktop'
       };
 
-      // macOS-specific: Add PYTHONPATH and DYLD_LIBRARY_PATH
+      // macOS-specific: Add PYTHONPATH, DYLD_LIBRARY_PATH, and MAGIC
       if (process.platform === 'darwin' && !isDev) {
         const resourcesPath = process.resourcesPath;
         const backendDir = path.join(resourcesPath, 'backend');
         const libDir = path.join(resourcesPath, 'lib');
+        const magicDbPath = path.join(resourcesPath, 'share', 'misc', 'magic.mgc');
+        const magicDbAlt = path.join(resourcesPath, 'share', 'misc', 'magic');
         
         env.PYTHONPATH = backendDir;
         log.info(`[macOS] Set PYTHONPATH to: ${backendDir}`);
@@ -199,6 +201,17 @@ class BackendManager {
           log.info(`[macOS] Set DYLD_LIBRARY_PATH to: ${libDir}`);
         } else {
           log.warn(`[macOS] lib directory not found at: ${libDir}`);
+        }
+
+        // Set MAGIC environment variable for python-magic
+        if (fs.existsSync(magicDbPath)) {
+          env.MAGIC = magicDbPath;
+          log.info(`[macOS] Set MAGIC to: ${magicDbPath}`);
+        } else if (fs.existsExists(magicDbAlt)) {
+          env.MAGIC = magicDbAlt;
+          log.info(`[macOS] Set MAGIC to: ${magicDbAlt}`);
+        } else {
+          log.warn(`[macOS] Magic database not found - file type detection may fail`);
         }
       }
 
