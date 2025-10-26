@@ -172,3 +172,8 @@ extraResources:
       - "**/*.dylib"
       - "**/*.so"
       - "!**/*.a"
+  # macOS: magic database for libmagic (CRITICAL FIX)
+  - from: ../dist/share
+    to: share
+    filter:
+      - "**/*"
