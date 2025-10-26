@@ -164,3 +164,8 @@ extraResources:
     to: python-dist
     filter:
       - "**/*"
+  # macOS only: libmagic system libraries for file type detection
+  - from: ../dist/lib
+    to: lib
+    filter:
+      - "**/*"
