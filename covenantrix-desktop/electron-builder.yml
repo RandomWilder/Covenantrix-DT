@@ -97,6 +97,7 @@ mac:
   signIgnore:
     - ".*\\.pyc$"
     - ".*/__pycache__/.*"
+    - ".*\\.a$"
   # Notarization configuration
   # electron-builder will read APPLE_ID and APPLE_ID_PASSWORD from environment
   # teamId must be explicitly configured (not a secret - visible in certificates)
@@ -164,8 +165,10 @@ extraResources:
     to: python-dist
     filter:
       - "**/*"
-  # macOS only: libmagic system libraries for file type detection
+  # macOS only: libmagic dynamic libraries for file type detection
   - from: ../dist/lib
     to: lib
     filter:
-      - "**/*"
+      - "**/*.dylib"
+      - "**/*.so"
+      - "!**/*.a"
