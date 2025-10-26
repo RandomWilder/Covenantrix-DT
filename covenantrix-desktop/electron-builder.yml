@@ -84,10 +84,12 @@ nsis:
 #
 mac:
   target:
+    - target: zip
+      arch:
+        - universal
     - target: dmg
       arch:
-        - x64
-        - arm64
+        - universal
   icon: public/icons/icon.icns
   category: public.app-category.productivity
   hardenedRuntime: true
