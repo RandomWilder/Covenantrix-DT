@@ -55,5 +55,7 @@ export {
   Clock,
   Loader2,
   Eye,
-  ExternalLink
+  ExternalLink,
+  Copy,
+  Check
 } from 'lucide-react';

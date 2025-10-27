@@ -60,7 +60,7 @@ class Settings(BaseSettings):
     
     # App metadata
     app_name: str = "Covenantrix"
-    version: str = "1.1.87"
+    version: str = "1.1.88"
     environment: str = Field("development", env="ENVIRONMENT")
     
     # Database configuration
