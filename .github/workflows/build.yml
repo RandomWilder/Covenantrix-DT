@@ -407,7 +407,7 @@ jobs:
         run: |
           echo "=== Build Output ==="
           ls -la covenantrix-desktop/dist/release/ || echo "No release directory"
-          find covenantrix-desktop/dist/release/ -type f \( -name "*.exe" -o -name "*.dmg" \) || echo "No installers"
+          find covenantrix-desktop/dist/release/ -type f \( -name "*.exe" -o -name "*.dmg" -o -name "*.zip" \) || echo "No installers"
           
       - name: Upload Artifacts
         uses: actions/upload-artifact@v4
@@ -416,6 +416,7 @@ jobs:
           path: |
             covenantrix-desktop/dist/release/*.exe
             covenantrix-desktop/dist/release/*.dmg
+            covenantrix-desktop/dist/release/*.zip
             covenantrix-desktop/dist/release/latest*.yml
           retention-days: 30
           if-no-files-found: error
@@ -440,6 +441,7 @@ jobs:
           mkdir -p release-files
           find artifacts/ -name "*.exe" -exec cp {} release-files/ \;
           find artifacts/ -name "*.dmg" -exec cp {} release-files/ \;
+          find artifacts/ -name "*.zip" -exec cp {} release-files/ \;
           find artifacts/ -name "latest*.yml" -exec cp {} release-files/ \;
           ls -la release-files/
           
