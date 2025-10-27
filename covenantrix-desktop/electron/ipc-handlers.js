@@ -806,16 +806,35 @@ function registerUpdateHandlers() {
 
   ipcMain.handle('update:install', async () => {
     try {
+      console.log('[IPC] Update install requested - preparing to quit and install');
       const { app } = require('electron');
+      const log = require('electron-log');
       
-      // Remove window-all-closed listener to prevent conflicts during update
-      app.removeAllListeners('window-all-closed');
+      log.info('[Update Install] User confirmed installation - preparing to restart');
+      log.info('[Update Install] Current version:', app.getVersion());
       
-      // Quit and install the update
-      autoUpdater.quitAndInstall(false, true);
-      // No return needed - app will quit
+      // Use setImmediate to ensure UI has time to respond before quitting
+      setImmediate(() => {
+        try {
+          log.info('[Update Install] Removing window-all-closed listeners');
+          // Remove window-all-closed listener to prevent conflicts during update
+          app.removeAllListeners('window-all-closed');
+          
+          log.info('[Update Install] Calling quitAndInstall...');
+          // Quit and install the update
+          // Parameters: isSilent=false (show install progress), isForceRunAfter=true (launch app after install)
+          autoUpdater.quitAndInstall(false, true);
+          
+          log.info('[Update Install] quitAndInstall called successfully');
+        } catch (innerError) {
+          log.error('[Update Install] Error in setImmediate block:', innerError);
+        }
+      });
+      
+      // Return success immediately - app will quit in setImmediate
+      return { success: true };
     } catch (error) {
-      console.error('Failed to install update:', error);
+      console.error('[IPC] Failed to install update:', error);
       return { success: false, error: error.message };
     }
   });

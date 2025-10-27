@@ -6,9 +6,16 @@ const log = require('electron-log');
 log.transports.file.level = 'info';
 autoUpdater.logger = log;
 
-// Disable auto-download - require user approval
-autoUpdater.autoDownload = false;
-autoUpdater.autoInstallOnAppQuit = true;
+// CRITICAL: Configure auto-updater for macOS
+autoUpdater.autoDownload = false; // Require user approval before download
+autoUpdater.autoInstallOnAppQuit = true; // Install when app quits normally
+autoUpdater.allowDowngrade = false; // Prevent downgrade attacks
+autoUpdater.allowPrerelease = false; // Only stable releases
+
+// Force check for updates even if same version (for testing)
+if (process.env.NODE_ENV === 'development') {
+  autoUpdater.forceDevUpdateConfig = true;
+}
 
 let updateCheckInProgress = false;
 let downloadInProgress = false;
@@ -75,7 +82,8 @@ class UpdateManager {
 
     // Update downloaded
     autoUpdater.on('update-downloaded', async (info) => {
-      log.info('Update downloaded:', info);
+      log.info('Update downloaded successfully:', info);
+      log.info('Downloaded file location:', info.downloadedFile);
       downloadInProgress = false;
       
       this.sendStatusToWindow('Update downloaded', info);
@@ -84,6 +92,7 @@ class UpdateManager {
       try {
         await this.createUpdateNotification(info, 'update_ready');
         this.sendStatusToWindow('update-ready-notification-created');
+        log.info('Update ready notification created successfully');
       } catch (error) {
         log.error('Failed to create notification, falling back to dialog:', error);
         // Fallback to original dialog method
@@ -292,11 +301,20 @@ class UpdateManager {
     dialog.showMessageBox(this.mainWindow, dialogOpts).then((returnValue) => {
       if (returnValue.response === 0) {
         // User clicked "Restart Now"
+        log.info('User confirmed installation via dialog - preparing to restart');
         setImmediate(() => {
-          // Disable beforeunload handler
-          app.removeAllListeners('window-all-closed');
-          autoUpdater.quitAndInstall(false, true);
+          try {
+            // Disable beforeunload handler
+            app.removeAllListeners('window-all-closed');
+            log.info('Calling quitAndInstall from fallback dialog...');
+            autoUpdater.quitAndInstall(false, true);
+            log.info('quitAndInstall called successfully from dialog');
+          } catch (error) {
+            log.error('Error calling quitAndInstall from dialog:', error);
+          }
         });
+      } else {
+        log.info('User chose to install update later');
       }
     });
   }
