@@ -2,21 +2,48 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+	<!-- JIT Compilation (Required for Python/V8) -->
 	<key>com.apple.security.cs.allow-jit</key>
 	<true/>
+	
+	<!-- Unsigned Executable Memory (Required for Python/Node.js) -->
 	<key>com.apple.security.cs.allow-unsigned-executable-memory</key>
 	<true/>
+	
+	<!-- DYLD Environment Variables (Required for Python paths) -->
 	<key>com.apple.security.cs.allow-dyld-environment-variables</key>
 	<true/>
+	
+	<!-- Library Validation (Disable for embedded Python) -->
 	<key>com.apple.security.cs.disable-library-validation</key>
 	<true/>
+	
+	<!-- Network Access (Required for API calls) -->
 	<key>com.apple.security.network.client</key>
 	<true/>
 	<key>com.apple.security.network.server</key>
 	<true/>
+	
+	<!-- File System Access (Required for document uploads) -->
 	<key>com.apple.security.files.user-selected.read-write</key>
 	<true/>
 	<key>com.apple.security.files.downloads.read-write</key>
 	<true/>
+	
+	<!-- CRITICAL: Auto-Update Entitlements -->
+	<!-- Allows app to replace itself during auto-update -->
+	<key>com.apple.security.temporary-exception.files.absolute-path.read-write</key>
+	<array>
+		<string>/Applications/Covenantrix.app/</string>
+		<string>/Users/*/Library/Caches/covenantrix-desktop-updater/</string>
+	</array>
+	
+	<!-- Allow spawning new process after update -->
+	<key>com.apple.security.cs.allow-unsigned-executable-memory</key>
+	<true/>
+	
+	<!-- Disable App Sandbox for auto-update to work -->
+	<key>com.apple.security.app-sandbox</key>
+	<false/>
 </dict>
 </plist>

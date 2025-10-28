@@ -47,7 +47,7 @@ export const Message: React.FC<MessageProps> = ({ message, isStreaming = false }
           {!message.isError && message.content && (
             <button
               onClick={handleCopy}
-              className={`absolute top-2 right-2 p-1.5 rounded transition-all duration-200 ${
+              className={`absolute bottom-2 left-2 p-1.5 rounded transition-all duration-200 ${
                 message.role === 'user'
                   ? 'bg-blue-700 hover:bg-blue-800 text-white opacity-0 group-hover:opacity-100'
                   : 'bg-gray-200 dark:bg-gray-600 hover:bg-gray-300 dark:hover:bg-gray-500 text-gray-600 dark:text-gray-300 opacity-0 group-hover:opacity-100'

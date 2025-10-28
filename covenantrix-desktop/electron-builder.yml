@@ -83,6 +83,8 @@ nsis:
 # to build with code signing only (app will be signed but not notarized)
 #
 mac:
+  # CRITICAL: ZIP must come BEFORE DMG for auto-updates to work properly
+  # electron-updater uses ZIP files for delta updates on macOS
   target:
     - target: zip
       arch:
@@ -94,10 +96,14 @@ mac:
         - arm64
   icon: public/icons/icon.icns
   category: public.app-category.productivity
+  # CRITICAL: hardenedRuntime MUST be true for notarization and auto-updates
   hardenedRuntime: true
+  # CRITICAL: gatekeeperAssess false allows unsigned code during development
   gatekeeperAssess: false
+  # CRITICAL: Entitlements required for auto-update to replace app
   entitlements: build/entitlements.mac.plist
   entitlementsInherit: build/entitlements.mac.plist
+  # Ignore Python bytecode and cache files during signing
   signIgnore:
     - ".*\\.pyc$"
     - ".*/__pycache__/.*"
