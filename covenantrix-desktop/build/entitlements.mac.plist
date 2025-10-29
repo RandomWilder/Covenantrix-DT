@@ -30,17 +30,12 @@
 	<key>com.apple.security.files.downloads.read-write</key>
 	<true/>
 	
-	<!-- CRITICAL: Auto-Update Entitlements -->
-	<!-- Allows app to replace itself during auto-update -->
+	<!-- CRITICAL: Auto-Update File Access -->
 	<key>com.apple.security.temporary-exception.files.absolute-path.read-write</key>
 	<array>
 		<string>/Applications/Covenantrix.app/</string>
 		<string>/Users/*/Library/Caches/covenantrix-desktop-updater/</string>
 	</array>
-	
-	<!-- Allow spawning new process after update -->
-	<key>com.apple.security.cs.allow-unsigned-executable-memory</key>
-	<true/>
 	
 	<!-- Disable App Sandbox for auto-update to work -->
 	<key>com.apple.security.app-sandbox</key>
