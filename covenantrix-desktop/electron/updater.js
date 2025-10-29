@@ -8,7 +8,7 @@ autoUpdater.logger = log;
 
 // CRITICAL: Configure auto-updater for macOS
 autoUpdater.autoDownload = false; // Require user approval before download
-autoUpdater.autoInstallOnAppQuit = true; // Install when app quits normally
+autoUpdater.autoInstallOnAppQuit = false; // Install when app quits normally
 autoUpdater.allowDowngrade = false; // Prevent downgrade attacks
 autoUpdater.allowPrerelease = false; // Only stable releases
 
