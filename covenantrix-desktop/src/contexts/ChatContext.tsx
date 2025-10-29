@@ -4,8 +4,7 @@ import {
   ConversationSummary,
   ChatContextValue, 
   ChatMessageRequest, 
-  ChatMessageResponse,
-  ConversationResponse
+  ChatMessageResponse
 } from '../types/chat'
 import { useToast } from '../hooks/useToast'
 import { createTimestamp } from '../utils/dateUtils'
@@ -250,30 +249,12 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
   }, [activeConversation, selectedAgent, showToast, chatApi])
 
   const createConversation = useCallback(async (): Promise<string> => {
-    try {
-      const response: ConversationResponse = await chatApi.createConversation('New Chat')
-      const newConversationSummary = response.conversation
-      
-      setConversations(prev => [newConversationSummary, ...prev])
-      
-      // Create a minimal conversation object for active conversation
-      const newConversation: Conversation = {
-        id: newConversationSummary.id,
-        title: newConversationSummary.title,
-        created_at: newConversationSummary.created_at,
-        updated_at: newConversationSummary.updated_at,
-        messages: []
-      }
-      
-      setActiveConversation(newConversation)
-      
-      return newConversation.id
-    } catch (error) {
-      console.error('Failed to create conversation:', error)
-      showToast('Failed to create conversation', 'error')
-      throw error
-    }
-  }, [showToast])
+    // Simply clear the active conversation
+    // The conversation will be created automatically when the first message is sent
+    // with a proper auto-generated title from the message content
+    setActiveConversation(null)
+    return '' // Return empty string as placeholder (not used by caller)
+  }, [])
 
   const deleteConversation = useCallback(async (id: string) => {
     try {

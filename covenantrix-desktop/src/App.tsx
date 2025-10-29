@@ -8,19 +8,23 @@ function App() {
   const { isFirstRun, isLoading } = useSettings()
   const { effectiveTheme } = useTheme()
   const [showOnboarding, setShowOnboarding] = useState(false)
+  const [onboardingDismissed, setOnboardingDismissed] = useState(false)
 
   useEffect(() => {
-    if (!isLoading && isFirstRun) {
+    // Only show if it's first run, not loading, not already showing, and not dismissed this session
+    if (!isLoading && isFirstRun && !showOnboarding && !onboardingDismissed) {
       setShowOnboarding(true)
     }
-  }, [isFirstRun, isLoading])
+  }, [isFirstRun, isLoading, showOnboarding, onboardingDismissed])
 
   const handleOnboardingComplete = () => {
     setShowOnboarding(false)
+    setOnboardingDismissed(true)
   }
 
   const handleOnboardingSkip = () => {
     setShowOnboarding(false)
+    setOnboardingDismissed(true)
   }
 
   if (isLoading) {

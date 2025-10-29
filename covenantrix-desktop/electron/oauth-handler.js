@@ -126,14 +126,14 @@ function openOAuthWindow(authUrl, mainWindow) {
       }
     });
     
-    // Add timeout protection (30 seconds)
+    // Add timeout protection (5 minutes)
     const timeout = setTimeout(() => {
       if (!callbackHandled && authWindow && !authWindow.isDestroyed()) {
         console.error('OAuth flow timeout - no callback received');
         authWindow.close();
         reject(new Error('OAuth flow timed out'));
       }
-    }, 30000);
+    }, 300000);
     
     // Clear timeout when promise settles
     authWindow.once('closed', () => {
