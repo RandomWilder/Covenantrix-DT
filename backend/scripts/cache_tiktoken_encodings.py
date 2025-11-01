@@ -71,11 +71,6 @@ def cache_tiktoken_encodings():
         try:
             print(f"  - Caching encoding: {encoding_name}...", end=" ", flush=True)
             encoding = tiktoken.get_encoding(encoding_name)
-            
-            # Store first encoding to detect cache directory later
-            if first_encoding is None:
-                first_encoding = encoding
-            
             cached_count += 1
             print("OK")
         except Exception as e:
