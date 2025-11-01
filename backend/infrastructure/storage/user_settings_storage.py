@@ -128,6 +128,33 @@ class UserSettingsStorage:
             version = data.get("version", "0.0")
             needs_save = False
             
+            # PROTECTION: Detect unexpected subscription tier changes during migration
+            # This serves as a safeguard to catch similar issues to Feature 0046
+            if self.storage_path.exists() and "subscription" in data:
+                try:
+                    with open(self.storage_path, 'r', encoding='utf-8') as f:
+                        stored_data = json.load(f)
+                        stored_subscription = stored_data.get("subscription", {})
+                        incoming_subscription = data.get("subscription", {})
+                        
+                        stored_tier = stored_subscription.get("tier")
+                        incoming_tier = incoming_subscription.get("tier")
+                        
+                        # If tier changed unexpectedly, log warning and preserve stored tier
+                        if stored_tier and incoming_tier and stored_tier != incoming_tier:
+                            logger.warning(
+                                f"PROTECTION: Unexpected subscription tier change detected during migration! "
+                                f"Preserving stored tier '{stored_tier}' over incoming tier '{incoming_tier}'. "
+                                f"Subscription tier should only change through /api/subscription/* endpoints."
+                            )
+                            # Preserve the stored subscription data
+                            data["subscription"] = stored_subscription
+                            needs_save = False  # Don't save the incoming data
+                except Exception as e:
+                    logger.debug(f"Could not check for subscription tier changes: {e}")
+                    # Non-critical, continue with normal migration
+                    pass
+            
             # Version 1.0 migration
             if version == "0.0":
                 logger.info("Migrating settings from version 0.0 to 1.0")
@@ -231,6 +258,14 @@ class UserSettingsStorage:
                     if subscription.get("last_tier_change") is None:
                         subscription["last_tier_change"] = now.isoformat()
                     needs_save = True
+                
+                # Ensure subscription structure is always valid (compute features from tier if missing)
+                if "features" not in subscription or subscription["features"] is None:
+                    from domain.subscription.tier_config import get_tier_features
+                    tier = subscription.get("tier", "trial")
+                    subscription["features"] = get_tier_features(tier)
+                    needs_save = True
+                    logger.info(f"Added computed features for subscription tier: {tier}")
             
             # Add onboarding_completed flag if missing
             # For existing installations, set to False to preserve current experience

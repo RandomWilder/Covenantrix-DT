@@ -227,6 +227,12 @@ async def update_settings(request: SettingsUpdateRequest):
                     }
                 )
         
+        # PROTECTION: Preserve subscription data from being overwritten by settings update
+        # Subscription tier should ONLY be modified through /api/subscription/* endpoints
+        current_settings = await settings_storage.load_settings()
+        request.settings.subscription = current_settings.subscription
+        logger.info(f"Subscription data protected: tier={current_settings.subscription.tier}")
+        
         # Default mode: NEVER block saves (system keys managed externally)
         # Update timestamp
         request.settings.last_updated = datetime.utcnow().isoformat()

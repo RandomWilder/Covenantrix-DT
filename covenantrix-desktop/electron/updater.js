@@ -8,7 +8,10 @@ autoUpdater.logger = log;
 
 // CRITICAL: Configure auto-updater for macOS
 autoUpdater.autoDownload = false; // Require user approval before download
-autoUpdater.autoInstallOnAppQuit = false; // Install when app quits normally
+// Platform-specific installation behavior:
+// - macOS: autoInstallOnAppQuit=true enables ZIP extraction on quit
+// - Windows: autoInstallOnAppQuit=false allows external NSIS installer to handle installation
+autoUpdater.autoInstallOnAppQuit = process.platform === 'darwin'; // Enable for macOS ZIP extraction
 autoUpdater.allowDowngrade = false; // Prevent downgrade attacks
 autoUpdater.allowPrerelease = false; // Only stable releases
 
@@ -195,12 +198,16 @@ class UpdateManager {
       };
     } else if (notificationType === 'update_ready') {
       // Update Ready Notification
+      const platformInstruction = process.platform === 'darwin' 
+        ? 'from your Applications folder or Dock' 
+        : 'from the Start Menu or Desktop shortcut';
+      
       notificationData = {
         type: 'version_ready',
         source: 'local',
         title: 'Update Ready to Install',
         summary: `Version ${info.version} is ready`,
-        content: `Covenantrix ${info.version} has been downloaded and is ready to install.\n\nThe application will restart to complete the update.\n\nClick 'Restart Now' when ready.`,
+        content: `Covenantrix ${info.version} has been downloaded and is ready to install.\n\nThe application will close to complete the update. After installation, please reopen the application manually ${platformInstruction}.\n\nClick 'Restart Now' when ready.`,
         actions: [
           { label: 'Restart Now', action: 'install_update' },
           { label: 'Later', action: 'dismiss' }
@@ -290,24 +297,30 @@ class UpdateManager {
    * @param {object} info - Update info
    */
   promptUserToInstall(info) {
+    const platformInstruction = process.platform === 'darwin' 
+      ? 'from your Applications folder or Dock' 
+      : 'from the Start Menu or Desktop shortcut';
+    
     const dialogOpts = {
       type: 'info',
       buttons: ['Restart Now', 'Later'],
       title: 'Update Ready',
       message: 'Update downloaded',
-      detail: `Covenantrix ${info.version} has been downloaded and is ready to install.\n\nThe application will restart to complete the update.\n\nRestart now?`
+      detail: `Covenantrix ${info.version} has been downloaded and is ready to install.\n\nThe application will close to complete the update. After installation, please reopen the application manually ${platformInstruction}.\n\nRestart now?`
     };
 
     dialog.showMessageBox(this.mainWindow, dialogOpts).then((returnValue) => {
       if (returnValue.response === 0) {
         // User clicked "Restart Now"
         log.info('User confirmed installation via dialog - preparing to restart');
+        log.info('[Update Install] Platform:', process.platform);
         setImmediate(() => {
           try {
             // Disable beforeunload handler
             app.removeAllListeners('window-all-closed');
             log.info('Calling quitAndInstall from fallback dialog...');
-            autoUpdater.quitAndInstall(false, true);
+            // Parameters: isSilent=false (show install progress on Windows), isForceRunAfter=false (do NOT auto-relaunch)
+            autoUpdater.quitAndInstall(false, false);
             log.info('quitAndInstall called successfully from dialog');
           } catch (error) {
             log.error('Error calling quitAndInstall from dialog:', error);

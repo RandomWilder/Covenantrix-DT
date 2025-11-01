@@ -44,6 +44,23 @@ export const getDefaultSettings = (): UserSettings => {
       email: undefined
     },
     google_accounts: [],
+    subscription: {
+      tier: 'trial',
+      license_key: undefined,
+      trial_started_at: undefined,
+      trial_expires_at: undefined,
+      grace_period_started_at: undefined,
+      grace_period_expires_at: undefined,
+      features: {
+        max_documents: 3,
+        max_doc_size_mb: 50,
+        max_total_storage_mb: 500,
+        max_queries_monthly: -1,
+        max_queries_daily: -1,
+        use_default_keys: true
+      },
+      last_tier_change: undefined
+    },
     version: '1.0',
     last_updated: createTimestamp()
   };
@@ -92,6 +109,7 @@ export const validateAndNormalizeSettings = (settings: any): UserSettings => {
       email: settings?.profile?.email
     },
     google_accounts: Array.isArray(settings?.google_accounts) ? settings.google_accounts : [],
+    subscription: settings?.subscription || defaults.subscription,
     version: settings?.version || defaults.version,
     last_updated: settings?.last_updated || new Date().toISOString()
   };

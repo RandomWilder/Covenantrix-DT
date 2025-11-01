@@ -81,6 +81,7 @@ export interface UserSettings {
   privacy: PrivacySettings;
   profile?: ProfileSettings;
   google_accounts?: GoogleAccountSettings[];
+  subscription?: SubscriptionSettings;
   version: string;
   last_updated?: string;
 }

@@ -811,6 +811,7 @@ function registerUpdateHandlers() {
       const log = require('electron-log');
       
       log.info('[Update Install] User confirmed installation - preparing to restart');
+      log.info('[Update Install] Platform:', process.platform);
       log.info('[Update Install] Current version:', app.getVersion());
       
       // Use setImmediate to ensure UI has time to respond before quitting
@@ -822,8 +823,9 @@ function registerUpdateHandlers() {
           
           log.info('[Update Install] Calling quitAndInstall...');
           // Quit and install the update
-          // Parameters: isSilent=false (show install progress), isForceRunAfter=true (launch app after install)
-          autoUpdater.quitAndInstall(false, true);
+          // Parameters: isSilent=false (show install progress on Windows), isForceRunAfter=false (do NOT auto-relaunch)
+          // User will manually reopen the app after installation completes
+          autoUpdater.quitAndInstall(false, false);
           
           log.info('[Update Install] quitAndInstall called successfully');
         } catch (innerError) {
