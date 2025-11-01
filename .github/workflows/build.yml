@@ -156,6 +156,10 @@ jobs:
           $PYTHON_CMD -c "import fitz; print('PyMuPDF OK')" || exit 1
           $PYTHON_CMD -c "from google.cloud import vision; print('Google Vision OK')" || exit 1
           
+          echo "Testing tiktoken and certifi (for SSL fix)..."
+          $PYTHON_CMD -c "import tiktoken; print('tiktoken OK')" || exit 1
+          $PYTHON_CMD -c "import certifi; print('certifi OK')" || exit 1
+          
           echo "All imports successful"
       
       - name: Install and Bundle libmagic (macOS)
@@ -232,6 +236,43 @@ jobs:
           sleep 2
           
           echo "Backend test passed"
+      
+      - name: Pre-cache tiktoken Encodings
+        shell: bash
+        run: |
+          echo "=== Pre-caching tiktoken encodings ==="
+          
+          if [ "${{ matrix.os }}" == "windows-latest" ]; then
+            PYTHON_CMD="dist/python-dist/python.exe"
+          else
+            PYTHON_CMD="dist/python-dist/bin/python"
+          fi
+          
+          echo "Running tiktoken cache script..."
+          $PYTHON_CMD backend/scripts/cache_tiktoken_encodings.py || {
+            echo "⚠️  WARNING: tiktoken cache generation failed"
+            echo "Build will continue - app will attempt runtime download"
+            exit 0
+          }
+          
+          echo "Verifying tiktoken cache was created..."
+          if [ -d "$HOME/.cache/tiktoken" ] || [ -d "$HOME/Library/Caches/tiktoken" ] || [ -d "$LOCALAPPDATA/tiktoken" ]; then
+            echo "✓ tiktoken cache created successfully"
+            
+            # Count cached files
+            CACHE_COUNT=0
+            for cache_dir in "$HOME/.cache/tiktoken" "$HOME/Library/Caches/tiktoken" "$LOCALAPPDATA/tiktoken"; do
+              if [ -d "$cache_dir" ]; then
+                CACHE_COUNT=$(find "$cache_dir" -name "*.tiktoken" 2>/dev/null | wc -l)
+                if [ $CACHE_COUNT -gt 0 ]; then
+                  echo "✓ Found $CACHE_COUNT encoding file(s) in cache"
+                  break
+                fi
+              fi
+            done
+          else
+            echo "⚠️  WARNING: tiktoken cache directory not found"
+          fi
       
       - name: Inject Production API Keys
         shell: bash
@@ -387,6 +428,22 @@ jobs:
             else
               echo "✓ magic database found:"
               ls -lh /tmp/covenantrix-verify/Covenantrix.app/Contents/Resources/share/misc/ || true
+            fi
+          fi
+          
+          # Check tiktoken cache (SSL FIX)
+          if [ ! -d "/tmp/covenantrix-verify/Covenantrix.app/Contents/Resources/tiktoken-cache" ]; then
+            echo "⚠️  WARNING: tiktoken-cache directory not found (SSL issues may occur)"
+          else
+            echo "✓ tiktoken-cache directory found"
+            
+            # Count .tiktoken files
+            TIKTOKEN_COUNT=$(find /tmp/covenantrix-verify/Covenantrix.app/Contents/Resources/tiktoken-cache -name "*.tiktoken" 2>/dev/null | wc -l | tr -d ' ')
+            if [ "$TIKTOKEN_COUNT" -gt 0 ]; then
+              echo "✓ Found $TIKTOKEN_COUNT tiktoken encoding file(s)"
+              ls -lh /tmp/covenantrix-verify/Covenantrix.app/Contents/Resources/tiktoken-cache/*/*.tiktoken 2>/dev/null || true
+            else
+              echo "⚠️  WARNING: No .tiktoken files found in cache"
             fi
           fi
           

@@ -15,6 +15,8 @@ openai>=1.3.0
 lightrag-hku
 langdetect>=1.0.9
 cohere>=5.0.0  # Cohere reranking API
+tiktoken>=0.5.1  # Token encoding for OpenAI models
+certifi>=2023.7.22  # SSL certificate bundle for corporate networks
 
 # File type detection
 python-magic-bin>=0.4.14; sys_platform == "win32"  # Windows - includes libmagic

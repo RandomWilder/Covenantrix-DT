@@ -1,6 +1,6 @@
 {
   "name": "covenantrix-desktop",
-  "version": "1.1.95",
+  "version": "1.1.96",
   "description": "Covenantrix - RAG-powered Document Intelligence Desktop App",
   "main": "electron/main.js",
   "homepage": "https://github.com/RandomWilder/Covenantrix-DT",
@@ -17,6 +17,7 @@
     "dev": "concurrently \"npm run dev:vite\" \"npm run dev:electron\"",
     "dev:vite": "vite",
     "dev:electron": "wait-on http://localhost:5173 && cross-env NODE_ENV=development electron .",
+    "prebuild": "node scripts/cache-tiktoken.js",
     "build": "tsc && vite build",
     "package:win": "npm run build && electron-builder --win --x64 --publish never",
     "package:mac": "npm run build && electron-builder --mac --publish never",

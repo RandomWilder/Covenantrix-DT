@@ -12,6 +12,54 @@ backend_dir = Path(__file__).parent.resolve()
 if str(backend_dir) not in sys.path:
     sys.path.insert(0, str(backend_dir))
 
+# ============================================
+# TIKTOKEN CACHE & SSL CONFIGURATION
+# ============================================
+# Pre-configure tiktoken cache and SSL certificates BEFORE any imports
+# This fixes SSL verification failures on corporate networks
+
+# Detect if running in production (packaged) vs development
+def is_production_mode():
+    """Detect if running in packaged/production mode"""
+    # Check if running from frozen/packaged executable
+    if getattr(sys, 'frozen', False):
+        return True
+    # Check if running from expected production path structure
+    app_path = Path(__file__).parent.parent.resolve()
+    resources_path = app_path / 'Resources'
+    return resources_path.exists()
+
+# Configure tiktoken cache directory
+if is_production_mode():
+    # In production: use bundled cache in Resources directory
+    app_path = Path(__file__).parent.parent.resolve()
+    
+    # Try macOS path structure first
+    resources_path = app_path / 'Resources'
+    if not resources_path.exists():
+        # Windows/Linux path structure
+        resources_path = app_path
+    
+    cache_dir = resources_path / 'tiktoken-cache'
+    
+    if cache_dir.exists():
+        os.environ['TIKTOKEN_CACHE_DIR'] = str(cache_dir)
+        print(f"[TIKTOKEN] Using bundled cache: {cache_dir}")
+    else:
+        print(f"[TIKTOKEN] WARNING: Bundled cache not found at {cache_dir}")
+        print("[TIKTOKEN] Will attempt runtime download (may fail on corporate networks)")
+else:
+    print("[TIKTOKEN] Development mode: using default tiktoken cache location")
+
+# Configure SSL certificates for any runtime downloads (fallback)
+try:
+    import certifi
+    os.environ['SSL_CERT_FILE'] = certifi.where()
+    os.environ['REQUESTS_CA_BUNDLE'] = certifi.where()
+    print(f"[SSL] Configured certificate bundle: {certifi.where()}")
+except ImportError:
+    print("[SSL] WARNING: certifi not available - SSL verification may fail")
+
 # Load .env file FIRST, before any other imports
 # This is critical for pydantic-settings to pick up environment variables
 # override=True ensures .env values take precedence over existing env vars

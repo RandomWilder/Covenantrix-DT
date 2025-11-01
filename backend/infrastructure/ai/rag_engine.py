@@ -335,6 +335,22 @@ class RAGEngine:
             else:
                 self.logger.info("[INFO] Reranking disabled (Cohere API key not configured)")
             
+            # Verify tiktoken cache is available (prevents SSL failures on corporate networks)
+            try:
+                import tiktoken
+                cache_dir = os.environ.get("TIKTOKEN_CACHE_DIR")
+                if cache_dir:
+                    self.logger.info(f"[TIKTOKEN] Using cache directory: {cache_dir}")
+                else:
+                    self.logger.info(f"[TIKTOKEN] Using default cache directory")
+                
+                # Pre-load encoding to verify cache works
+                encoding = tiktoken.get_encoding("o200k_base")
+                self.logger.info(f"[TIKTOKEN] Successfully loaded o200k_base encoding ({len(encoding.encode('test'))} tokens for 'test')")
+            except Exception as e:
+                self.logger.warning(f"[TIKTOKEN] Cache verification failed: {e}")
+                self.logger.warning("[TIKTOKEN] Will attempt to download encodings (may fail on corporate networks)")
+            
             # Initialize LightRAG with custom functions and optional reranking
             self._rag = LightRAG(
                 working_dir=str(self.working_dir),

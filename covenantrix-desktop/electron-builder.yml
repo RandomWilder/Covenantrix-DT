@@ -187,3 +187,8 @@ extraResources:
     to: share
     filter:
       - "**/*"
+  # tiktoken encoding cache for offline operation (SSL fix for corporate networks)
+  - from: ../dist/tiktoken-cache
+    to: tiktoken-cache
+    filter:
+      - "**/*"
