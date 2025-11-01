@@ -1,0 +1,26 @@
+# tiktoken Cache Directory
+
+This directory contains pre-cached tiktoken encoding files that are bundled with the application.
+
+These files eliminate the need for runtime downloads and prevent SSL certificate verification failures on corporate networks.
+
+## Files
+- `*/o200k_base.tiktoken` - Encoding for GPT-4o models
+- `*/cl100k_base.tiktoken` - Encoding for GPT-4 and embedding models
+
+## Updating Cache
+To regenerate the cache files (rarely needed):
+```bash
+cd backend
+pip install tiktoken
+python scripts/generate_tiktoken_cache.py
+git add tiktoken_cache/
+git commit -m "chore: Update tiktoken cache"
+```
+
+## Size
+Total: ~3.5 MB (two .tiktoken files)
+
+## Purpose
+These files are copied to the application bundle during the build process, ensuring the app works offline and on corporate networks with SSL inspection.
+

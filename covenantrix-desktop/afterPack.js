@@ -43,9 +43,17 @@ exports.default = async function(context) {
       }
     }
     countFiles(tiktokenCachePath);
-    console.log(`✓ tiktoken cache bundled: ${fileCount} encoding file(s)`);
+    
+    if (fileCount > 0) {
+      console.log(`✓ tiktoken cache bundled: ${fileCount} encoding file(s)`);
+    } else {
+      console.warn('WARNING: tiktoken-cache directory exists but no .tiktoken files found');
+      console.warn('  This may cause SSL issues on corporate networks');
+    }
   } else {
-    console.warn('WARNING: tiktoken cache not found - SSL issues may occur on corporate networks');
+    console.warn('WARNING: tiktoken-cache directory not found');
+    console.warn('  SSL certificate verification may fail on corporate networks');
+    console.warn('  Run: python backend/scripts/generate_tiktoken_cache.py');
   }
   
   // macOS-specific: Set Python executable permissions
