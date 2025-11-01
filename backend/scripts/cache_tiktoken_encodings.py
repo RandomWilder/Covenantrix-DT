@@ -40,7 +40,7 @@ def cache_tiktoken_encodings():
     print("\n[1/2] Caching encodings by name...")
     for encoding_name in encodings_to_cache:
         try:
-            print(f"  - Caching encoding: {encoding_name}...", end=" ")
+            print(f"  - Caching encoding: {encoding_name}...", end=" ", flush=True)
             encoding = tiktoken.get_encoding(encoding_name)
             
             # Get cache directory from the encoding object
@@ -52,21 +52,21 @@ def cache_tiktoken_encodings():
                     cache_dir = encoding._tiktoken_cache_dir
             
             cached_count += 1
-            print("✓")
+            print("OK")
         except Exception as e:
-            print(f"✗ ({e})")
+            print(f"FAILED ({e})")
             failed_encodings.append((encoding_name, str(e)))
     
     # Cache by model name
     print("\n[2/2] Caching encodings by model name...")
     for model_name in models_to_cache:
         try:
-            print(f"  - Caching model: {model_name}...", end=" ")
+            print(f"  - Caching model: {model_name}...", end=" ", flush=True)
             encoding = tiktoken.encoding_for_model(model_name)
             cached_count += 1
-            print("✓")
+            print("OK")
         except Exception as e:
-            print(f"✗ ({e})")
+            print(f"FAILED ({e})")
             failed_encodings.append((model_name, str(e)))
     
     # Detect actual cache directory
