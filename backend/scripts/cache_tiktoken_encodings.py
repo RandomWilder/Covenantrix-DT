@@ -7,21 +7,34 @@ import os
 import sys
 from pathlib import Path
 
-def get_tiktoken_cache_dir():
-    """Get the actual tiktoken cache directory"""
+# CRITICAL: Set cache directory BEFORE importing tiktoken
+# This ensures we know exactly where the cache will be stored
+def setup_cache_directory():
+    """Create and configure dedicated tiktoken cache directory"""
     import platform
     
-    # Platform-specific default cache locations
+    # Determine platform-specific cache location
     if platform.system() == "Windows":
-        # Windows: AppData\Local\tiktoken_cache
-        local_app_data = os.environ.get("LOCALAPPDATA")
-        if local_app_data:
-            return os.path.join(local_app_data, "tiktoken_cache")
-        # Fallback
-        return os.path.join(os.path.expanduser("~"), "AppData", "Local", "tiktoken_cache")
+        # Windows: Use script's parent directory for predictable location
+        script_dir = Path(__file__).parent.parent.parent.resolve()
+        cache_dir = script_dir / "dist" / "tiktoken-cache-temp"
     else:
-        # Unix/macOS: ~/.cache/tiktoken
-        return os.path.join(os.path.expanduser("~"), ".cache", "tiktoken")
+        # Unix/macOS: Use script's parent directory
+        script_dir = Path(__file__).parent.parent.parent.resolve()
+        cache_dir = script_dir / "dist" / "tiktoken-cache-temp"
+    
+    # Create cache directory
+    cache_dir.mkdir(parents=True, exist_ok=True)
+    
+    # Set environment variable so tiktoken uses this location
+    os.environ['TIKTOKEN_CACHE_DIR'] = str(cache_dir)
+    
+    return str(cache_dir)
+
+# Set up cache directory BEFORE any tiktoken imports
+CACHE_DIR = setup_cache_directory()
+print(f"Pre-configured cache directory: {CACHE_DIR}")
+print(f"TIKTOKEN_CACHE_DIR environment variable set\n")
 
 def cache_tiktoken_encodings():
     """Download and cache all required tiktoken encodings"""
@@ -48,13 +61,12 @@ def cache_tiktoken_encodings():
     print("tiktoken Encoding Cache Generator")
     print("=" * 60)
     
-    cache_dir = None
+    cache_dir = CACHE_DIR  # Use pre-configured directory
     cached_count = 0
     failed_encodings = []
-    first_encoding = None
     
     # Cache by encoding name
-    print("\n[1/2] Caching encodings by name...")
+    print("[1/2] Caching encodings by name...")
     for encoding_name in encodings_to_cache:
         try:
             print(f"  - Caching encoding: {encoding_name}...", end=" ", flush=True)
@@ -82,52 +94,7 @@ def cache_tiktoken_encodings():
             print(f"FAILED ({e})")
             failed_encodings.append((model_name, str(e)))
     
-    # Detect actual cache directory by searching for cached files
-    print("\n" + "=" * 60)
-    print("Detecting Cache Location")
-    print("=" * 60)
-    
-    # Try to get cache directory from environment variable (if set by tiktoken)
-    cache_dir = os.environ.get("TIKTOKEN_CACHE_DIR")
-    
-    if not cache_dir:
-        # Try platform-specific default location
-        cache_dir = get_tiktoken_cache_dir()
-        print(f"Trying default location: {cache_dir}")
-    
-    # If default doesn't exist, search for tiktoken cache files
-    if not os.path.exists(cache_dir):
-        print(f"Default location not found, searching...")
-        
-        # Search common locations
-        search_paths = []
-        home = os.path.expanduser("~")
-        
-        if os.name == 'nt':  # Windows
-            search_paths = [
-                os.path.join(os.environ.get("LOCALAPPDATA", ""), "tiktoken_cache"),
-                os.path.join(os.environ.get("APPDATA", ""), "tiktoken_cache"),
-                os.path.join(home, "AppData", "Local", "tiktoken_cache"),
-                os.path.join(home, ".tiktoken_cache"),
-            ]
-        else:  # Unix/macOS
-            search_paths = [
-                os.path.join(home, ".cache", "tiktoken"),
-                os.path.join(home, ".tiktoken_cache"),
-                os.path.join("/tmp", "tiktoken_cache"),
-            ]
-        
-        for search_path in search_paths:
-            if os.path.exists(search_path):
-                # Check if it contains .tiktoken files
-                for root, dirs, files in os.walk(search_path):
-                    if any(f.endswith('.tiktoken') for f in files):
-                        cache_dir = search_path
-                        print(f"Found cache at: {cache_dir}")
-                        break
-                if os.path.exists(cache_dir) and cache_dir != search_path:
-                    break
-    
+    # Cache directory was pre-configured, verify it was used
     print("\n" + "=" * 60)
     print("Cache Summary")
     print("=" * 60)
@@ -139,39 +106,44 @@ def cache_tiktoken_encodings():
         for name, error in failed_encodings:
             print(f"  - {name}: {error}")
     
-    # Check if cache directory exists and has files
-    if cache_dir and os.path.exists(cache_dir):
-        cache_files = []
+    # Verify cache directory has files
+    cache_files = []
+    if os.path.exists(cache_dir):
         for root, dirs, files in os.walk(cache_dir):
             for file in files:
                 if file.endswith('.tiktoken'):
                     cache_files.append(os.path.join(root, file))
-        
-        print(f"\nCache directory: {cache_dir}")
-        print(f"Cached files: {len(cache_files)}")
-        
-        if cache_files:
-            print("\nCached encoding files:")
-            for file_path in cache_files:
-                file_size = os.path.getsize(file_path) / (1024 * 1024)  # MB
-                rel_path = os.path.relpath(file_path, cache_dir)
-                print(f"  - {rel_path} ({file_size:.2f} MB)")
-        
-        # Output cache directory for build script to parse
-        print(f"\nTIKTOKEN_CACHE_DIR={cache_dir}")
-        
+    
+    print(f"\nCache directory: {cache_dir}")
+    print(f"Directory exists: {os.path.exists(cache_dir)}")
+    print(f"Cached files found: {len(cache_files)}")
+    
+    if cache_files:
+        print("\nCached encoding files:")
+        total_size = 0
+        for file_path in cache_files:
+            file_size = os.path.getsize(file_path) / (1024 * 1024)  # MB
+            total_size += file_size
+            rel_path = os.path.relpath(file_path, cache_dir)
+            print(f"  - {rel_path} ({file_size:.2f} MB)")
+        print(f"\nTotal cache size: {total_size:.2f} MB")
+    
+    # Output cache directory for build script to parse
+    print(f"\nTIKTOKEN_CACHE_DIR={cache_dir}")
+    
+    # Verify success
+    if cache_files:
+        print("\n" + "=" * 60)
+        print("SUCCESS: Cache generated and verified")
+        print("=" * 60)
         return 0 if not failed_encodings else 1
     else:
-        # Encodings were cached successfully but we couldn't locate the directory
-        # This is OK - tiktoken will find them at runtime
-        print(f"\nWARNING: Could not locate cache directory")
-        print(f"Searched: {cache_dir if cache_dir else 'unknown'}")
-        print(f"\nEncodings were cached successfully by tiktoken.")
-        print(f"tiktoken will find them automatically at runtime.")
-        print(f"\nNote: The build script will use tiktoken's default cache location.")
-        
-        # Return success since caching operations succeeded
-        return 0 if not failed_encodings else 1
+        print("\n" + "=" * 60)
+        print("ERROR: No cache files found after caching")
+        print("=" * 60)
+        print("Encodings appeared to cache successfully but files not found.")
+        print("This may indicate a tiktoken configuration issue.")
+        return 1
 
 if __name__ == "__main__":
     sys.exit(cache_tiktoken_encodings())

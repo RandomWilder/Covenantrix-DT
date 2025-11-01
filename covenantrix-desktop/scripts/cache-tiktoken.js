@@ -111,26 +111,39 @@ function searchForTiktokenFiles(dir) {
 }
 
 function getTiktokenCacheDir(pythonOutput) {
-  // Parse the TIKTOKEN_CACHE_DIR from Python script output
+  // Parse the TIKTOKEN_CACHE_DIR from Python script output (primary method)
   const match = pythonOutput.match(/TIKTOKEN_CACHE_DIR=(.+)/);
   if (match) {
-    return match[1].trim();
+    const cacheDir = match[1].trim();
+    log(`  Cache directory from Python: ${cacheDir}`, colors.cyan);
+    
+    // Verify it exists and has files
+    if (fs.existsSync(cacheDir)) {
+      const hasFiles = searchForTiktokenFiles(cacheDir);
+      if (hasFiles) {
+        return cacheDir;
+      } else {
+        log(`  WARNING: Cache directory exists but no .tiktoken files found`, colors.yellow);
+      }
+    }
+  }
+  
+  // Try the dedicated temporary cache location (set by Python script)
+  const dedicatedCache = path.join(__dirname, '..', '..', 'dist', 'tiktoken-cache-temp');
+  if (fs.existsSync(dedicatedCache) && searchForTiktokenFiles(dedicatedCache)) {
+    log(`  Found cache in dedicated location: ${dedicatedCache}`, colors.green);
+    return dedicatedCache;
   }
   
   // Search for actual cache location
   const foundCache = findTiktokenCache();
   if (foundCache) {
+    log(`  Found cache via search: ${foundCache}`, colors.green);
     return foundCache;
   }
   
-  // Fallback to default location (even if it doesn't exist yet)
-  const homeDir = process.env.HOME || process.env.USERPROFILE;
-  if (process.platform === 'win32') {
-    const localAppData = process.env.LOCALAPPDATA || path.join(homeDir, 'AppData', 'Local');
-    return path.join(localAppData, 'tiktoken_cache');
-  } else {
-    return path.join(homeDir, '.cache', 'tiktoken');
-  }
+  log(`  WARNING: Could not locate tiktoken cache`, colors.yellow);
+  return null;
 }
 
 function copyDirectory(src, dest) {
@@ -203,9 +216,17 @@ function main() {
     log('\n[4/5] Copying cache to dist directory...', colors.bright);
     const distCacheDir = path.join(__dirname, '..', '..', 'dist', 'tiktoken-cache');
     
+    if (!cacheDir) {
+      log(`  ✗ Cache directory could not be determined`, colors.red);
+      log('  WARNING: Cache will not be bundled', colors.yellow);
+      log('  Application will attempt to download encodings at runtime', colors.yellow);
+      process.exit(0);
+    }
+    
     if (!fs.existsSync(cacheDir)) {
       log(`  ✗ Cache directory not found: ${cacheDir}`, colors.red);
       log('  WARNING: Cache will not be bundled', colors.yellow);
+      log('  Application will attempt to download encodings at runtime', colors.yellow);
       process.exit(0);
     }
     
