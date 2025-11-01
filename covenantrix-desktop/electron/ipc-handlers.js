@@ -823,9 +823,10 @@ function registerUpdateHandlers() {
           
           log.info('[Update Install] Calling quitAndInstall...');
           // Quit and install the update
-          // Parameters: isSilent=false (show install progress on Windows), isForceRunAfter=false (do NOT auto-relaunch)
-          // User will manually reopen the app after installation completes
-          autoUpdater.quitAndInstall(false, false);
+          // Parameters: isSilent=false (show install progress if needed), isForceRunAfter=true (auto-relaunch after install)
+          // macOS: ZIP extraction happens immediately, then app relaunches automatically
+          // Windows: NSIS installer runs, then app relaunches automatically
+          autoUpdater.quitAndInstall(false, true);
           
           log.info('[Update Install] quitAndInstall called successfully');
         } catch (innerError) {
