@@ -41,6 +41,75 @@ function getPythonExecutable() {
   return 'python3';
 }
 
+function findTiktokenCache() {
+  /**
+   * Search for tiktoken cache directory across common locations
+   * Returns the path if found, null otherwise
+   */
+  const homeDir = process.env.HOME || process.env.USERPROFILE;
+  const searchPaths = [];
+  
+  if (process.platform === 'win32') {
+    // Windows locations
+    const localAppData = process.env.LOCALAPPDATA || path.join(homeDir, 'AppData', 'Local');
+    searchPaths.push(
+      path.join(localAppData, 'tiktoken_cache'),
+      path.join(localAppData, 'tiktoken'),
+      path.join(process.env.APPDATA || path.join(homeDir, 'AppData', 'Roaming'), 'tiktoken_cache'),
+      path.join(homeDir, '.tiktoken_cache'),
+      path.join(homeDir, '.cache', 'tiktoken')
+    );
+  } else {
+    // Unix/macOS locations
+    searchPaths.push(
+      path.join(homeDir, '.cache', 'tiktoken'),
+      path.join(homeDir, '.tiktoken_cache'),
+      path.join('/tmp', 'tiktoken_cache')
+    );
+  }
+  
+  // Search for directory containing .tiktoken files
+  for (const searchPath of searchPaths) {
+    if (fs.existsSync(searchPath)) {
+      // Check if it contains .tiktoken files
+      try {
+        const hasTokenFiles = searchForTiktokenFiles(searchPath);
+        if (hasTokenFiles) {
+          return searchPath;
+        }
+      } catch (err) {
+        // Continue searching
+      }
+    }
+  }
+  
+  return null;
+}
+
+function searchForTiktokenFiles(dir) {
+  /**
+   * Recursively search for .tiktoken files in directory
+   * Returns true if found
+   */
+  try {
+    const entries = fs.readdirSync(dir, { withFileTypes: true });
+    for (const entry of entries) {
+      if (entry.isFile() && entry.name.endsWith('.tiktoken')) {
+        return true;
+      }
+      if (entry.isDirectory()) {
+        const subPath = path.join(dir, entry.name);
+        if (searchForTiktokenFiles(subPath)) {
+          return true;
+        }
+      }
+    }
+  } catch (err) {
+    // Permission denied or other error
+  }
+  return false;
+}
+
 function getTiktokenCacheDir(pythonOutput) {
   // Parse the TIKTOKEN_CACHE_DIR from Python script output
   const match = pythonOutput.match(/TIKTOKEN_CACHE_DIR=(.+)/);
@@ -48,10 +117,17 @@ function getTiktokenCacheDir(pythonOutput) {
     return match[1].trim();
   }
   
-  // Fallback to default location
+  // Search for actual cache location
+  const foundCache = findTiktokenCache();
+  if (foundCache) {
+    return foundCache;
+  }
+  
+  // Fallback to default location (even if it doesn't exist yet)
   const homeDir = process.env.HOME || process.env.USERPROFILE;
   if (process.platform === 'win32') {
-    return path.join(homeDir, 'AppData', 'Local', 'tiktoken');
+    const localAppData = process.env.LOCALAPPDATA || path.join(homeDir, 'AppData', 'Local');
+    return path.join(localAppData, 'tiktoken_cache');
   } else {
     return path.join(homeDir, '.cache', 'tiktoken');
   }
