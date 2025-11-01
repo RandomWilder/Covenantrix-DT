@@ -188,13 +188,7 @@ extraResources:
     filter:
       - "**/*"
   # tiktoken encoding cache for offline operation (SSL fix for corporate networks)
-  # Primary: Use pre-committed cache from repository
   - from: ../backend/tiktoken_cache
-    to: tiktoken-cache
-    filter:
-      - "**/*"
-  # Fallback: Use build-generated cache if available
-  - from: ../dist/tiktoken-cache
     to: tiktoken-cache
     filter:
       - "**/*"

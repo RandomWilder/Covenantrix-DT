@@ -237,41 +237,25 @@ jobs:
           
           echo "Backend test passed"
       
-      - name: Pre-cache tiktoken Encodings
+      - name: Verify tiktoken Cache in Repository
         shell: bash
         run: |
-          echo "=== Pre-caching tiktoken encodings ==="
+          echo "=== Verifying pre-committed tiktoken cache ==="
           
-          if [ "${{ matrix.os }}" == "windows-latest" ]; then
-            PYTHON_CMD="dist/python-dist/python.exe"
+          if [ -d "backend/tiktoken_cache" ]; then
+            CACHE_COUNT=$(find backend/tiktoken_cache -name "*.tiktoken" 2>/dev/null | wc -l | tr -d ' ')
+            if [ "$CACHE_COUNT" -gt 0 ]; then
+              echo "✓ Found $CACHE_COUNT tiktoken encoding file(s) in repository"
+              echo "✓ Cache will be bundled with application"
+            else
+              echo "❌ ERROR: backend/tiktoken_cache exists but no .tiktoken files found"
+              echo "Run: python backend/scripts/generate_tiktoken_cache.py"
+              exit 1
+            fi
           else
-            PYTHON_CMD="dist/python-dist/bin/python"
-          fi
-          
-          echo "Running tiktoken cache script..."
-          $PYTHON_CMD backend/scripts/cache_tiktoken_encodings.py || {
-            echo "⚠️  WARNING: tiktoken cache generation failed"
-            echo "Build will continue - app will attempt runtime download"
-            exit 0
-          }
-          
-          echo "Verifying tiktoken cache was created..."
-          if [ -d "$HOME/.cache/tiktoken" ] || [ -d "$HOME/Library/Caches/tiktoken" ] || [ -d "$LOCALAPPDATA/tiktoken" ]; then
-            echo "✓ tiktoken cache created successfully"
-            
-            # Count cached files
-            CACHE_COUNT=0
-            for cache_dir in "$HOME/.cache/tiktoken" "$HOME/Library/Caches/tiktoken" "$LOCALAPPDATA/tiktoken"; do
-              if [ -d "$cache_dir" ]; then
-                CACHE_COUNT=$(find "$cache_dir" -name "*.tiktoken" 2>/dev/null | wc -l)
-                if [ $CACHE_COUNT -gt 0 ]; then
-                  echo "✓ Found $CACHE_COUNT encoding file(s) in cache"
-                  break
-                fi
-              fi
-            done
-          else
-            echo "⚠️  WARNING: tiktoken cache directory not found"
+            echo "❌ ERROR: backend/tiktoken_cache directory not found"
+            echo "Run: python backend/scripts/generate_tiktoken_cache.py"
+            exit 1
           fi
       
       - name: Inject Production API Keys
