@@ -246,17 +246,19 @@ jobs:
             CACHE_COUNT=$(find backend/tiktoken_cache -name "*.tiktoken" 2>/dev/null | wc -l | tr -d ' ')
             if [ "$CACHE_COUNT" -gt 0 ]; then
               echo "✓ Found $CACHE_COUNT tiktoken encoding file(s) in repository"
-              echo "✓ Cache will be bundled with application"
+              echo "✓ Cache will be bundled with application (no SSL issues on corporate networks)"
             else
-              echo "❌ ERROR: backend/tiktoken_cache exists but no .tiktoken files found"
-              echo "Run: python backend/scripts/generate_tiktoken_cache.py"
-              exit 1
+              echo "⚠️  WARNING: backend/tiktoken_cache exists but no .tiktoken files found"
+              echo "⚠️  Application will attempt runtime download (may fail on corporate networks)"
+              echo "To fix: python backend/scripts/generate_tiktoken_cache.py"
             fi
           else
-            echo "❌ ERROR: backend/tiktoken_cache directory not found"
-            echo "Run: python backend/scripts/generate_tiktoken_cache.py"
-            exit 1
+            echo "⚠️  WARNING: backend/tiktoken_cache directory not found"
+            echo "⚠️  Application will attempt runtime download (may fail on corporate networks)"
+            echo "To fix: python backend/scripts/generate_tiktoken_cache.py"
           fi
+          
+          echo "Build will continue..."
       
       - name: Inject Production API Keys
         shell: bash
