@@ -3,17 +3,19 @@ import {
   Home, 
   FileText, 
   MessageSquare, 
+  Network,
   BarChart3, 
   Settings, 
   Upload,
   FolderOpen,
   History
 } from 'lucide-react'
+import type { Screen } from '../../types/navigation'
 
 interface SidebarProps {
   className?: string
-  onNavigate?: (screen: string) => void
-  activeScreen?: string
+  onNavigate?: (screen: Screen) => void
+  activeScreen?: Screen
 }
 
 const Sidebar: React.FC<SidebarProps> = ({ 
@@ -21,10 +23,11 @@ const Sidebar: React.FC<SidebarProps> = ({
   onNavigate,
   activeScreen = 'dashboard'
 }) => {
-  const navigationItems = [
+  const navigationItems: Array<{ icon: any; label: string; screen: Screen }> = [
     { icon: Home, label: 'Dashboard', screen: 'dashboard' },
     { icon: FileText, label: 'Documents', screen: 'documents' },
     { icon: MessageSquare, label: 'Chat', screen: 'chat' },
+    { icon: Network, label: 'Knowledge Graph', screen: 'graph' },
     { icon: BarChart3, label: 'Analytics', screen: 'analytics' },
     { icon: Upload, label: 'Upload', screen: 'upload' },
     { icon: FolderOpen, label: 'Library', screen: 'library' },

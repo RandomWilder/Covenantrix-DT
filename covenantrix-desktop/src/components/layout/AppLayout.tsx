@@ -1,22 +1,39 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import Header from './Header'
 import Sidebar from './Sidebar'
 import StatusBar from './StatusBar'
 import UploadScreen from '../../features/upload/UploadScreen'
 import DocumentsScreen from '../../features/documents/DocumentsScreen'
 import { ChatScreen } from '../../features/chat/ChatScreen'
+import GraphVisualization from '../../features/graph/GraphVisualization'
 import { ChatProvider } from '../../contexts/ChatContext'
 import ProfileModal from '../../features/profile/ProfileModal'
 import { TrialBanner } from '../../features/subscription/TrialBanner'
 import { GracePeriodWarning } from '../../features/subscription/GracePeriodWarning'
+import type { Screen } from '../../types/navigation'
 
 interface AppLayoutProps {
   children?: React.ReactNode
 }
 
 const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
-  const [activeScreen, setActiveScreen] = useState<string>('dashboard')
+  const [activeScreen, setActiveScreen] = useState<Screen>('dashboard')
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false)
+
+  // Listen for navigation events from child components
+  useEffect(() => {
+    const handleNavigate = (event: CustomEvent) => {
+      const { screen } = event.detail
+      if (screen) {
+        setActiveScreen(screen as Screen)
+      }
+    }
+
+    window.addEventListener('navigate', handleNavigate as EventListener)
+    return () => {
+      window.removeEventListener('navigate', handleNavigate as EventListener)
+    }
+  }, [])
 
   const renderContent = () => {
     switch (activeScreen) {
@@ -30,6 +47,8 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
             <ChatScreen />
           </ChatProvider>
         )
+      case 'graph':
+        return <GraphVisualization />
       case 'dashboard':
       default:
         return children || (

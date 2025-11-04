@@ -1,6 +1,6 @@
 {
   "name": "covenantrix-desktop",
-  "version": "1.2.7",
+  "version": "1.2.8",
   "description": "Covenantrix - RAG-powered Document Intelligence Desktop App",
   "main": "electron/main.js",
   "homepage": "https://github.com/RandomWilder/Covenantrix-DT",
@@ -73,6 +73,7 @@
     "react-dom": "^18.2.0",
     "react-i18next": "^13.5.0",
     "react-markdown": "^9.0.0",
+    "reactflow": "^11.11.4",
     "remark-gfm": "^4.0.0",
     "tailwind-merge": "^2.2.0"
   }

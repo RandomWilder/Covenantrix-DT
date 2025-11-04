@@ -1,7 +1,7 @@
 """
 API Routes
 """
-from api.routes import health, documents, queries, analytics, agents, integrations
+from api.routes import health, documents, queries, analytics, agents, integrations, graph
 
 __all__ = [
     "health",
@@ -9,5 +9,6 @@ __all__ = [
     "queries",
     "analytics",
     "agents",
-    "integrations"
+    "integrations",
+    "graph"
 ]

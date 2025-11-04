@@ -104,7 +104,7 @@ from api.middleware.subscription_enforcement import add_subscription_enforcement
 # Import routers
 from api.routes import (
     health, documents, queries, analytics,
-    agents, integrations, auth, storage, chat, services, google, notifications, subscription
+    agents, integrations, auth, storage, chat, services, google, notifications, subscription, graph
 )
 from api.routes import settings as settings_router
 
@@ -296,6 +296,7 @@ def create_application() -> FastAPI:
     app.include_router(documents.router)
     app.include_router(queries.router)
     app.include_router(analytics.router)
+    app.include_router(graph.router)
     app.include_router(agents.router)
     app.include_router(integrations.router)
     app.include_router(auth.router)
