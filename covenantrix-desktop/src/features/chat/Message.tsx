@@ -64,9 +64,9 @@ export const Message: React.FC<MessageProps> = ({ message, isStreaming = false }
           )}
           
           {message.isError ? (
-            <div className="text-red-600 dark:text-red-400">{message.content}</div>
+            <div className="text-red-600 dark:text-red-400 selectable-text">{message.content}</div>
           ) : message.role === 'user' ? (
-            <div className="whitespace-pre-wrap">{message.content}</div>
+            <div className="whitespace-pre-wrap selectable-text">{message.content}</div>
           ) : (message.isStreaming || isStreaming) && !message.content ? (
             <div className="flex items-center gap-2 text-gray-500 dark:text-gray-400">
               <Loader2 className="w-4 h-4 animate-spin" />
@@ -75,7 +75,7 @@ export const Message: React.FC<MessageProps> = ({ message, isStreaming = false }
           ) : (
             <>
               <ReactMarkdown 
-                className="markdown-content"
+                className="markdown-content selectable-text"
                 remarkPlugins={[remarkGfm]}
               >
                 {message.content}
@@ -92,7 +92,7 @@ export const Message: React.FC<MessageProps> = ({ message, isStreaming = false }
             {message.sources.map((source, index) => (
               <div
                 key={index}
-                className="text-xs text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-gray-800 px-2 py-1 rounded border-l-2 border-blue-200 dark:border-blue-600"
+                className="text-xs text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-gray-800 px-2 py-1 rounded border-l-2 border-blue-200 dark:border-blue-600 selectable-text"
               >
                 <span className="font-medium">{source.document_name}</span>
                 {source.page_number && <span> (Page {source.page_number})</span>}

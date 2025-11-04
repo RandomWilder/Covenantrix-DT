@@ -5,6 +5,12 @@
   color: inherit;
 }
 
+/* Ensure all markdown elements support text selection */
+.markdown-content * {
+  -webkit-user-select: text;
+  user-select: text;
+}
+
 /* Headers */
 .markdown-content h1,
 .markdown-content h2,

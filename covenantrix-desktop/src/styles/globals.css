@@ -75,6 +75,14 @@ body {
   -webkit-app-region: no-drag;
 }
 
+/* Text selection utility - enables text selection for specific content areas */
+.selectable-text {
+  -webkit-user-select: text;
+  user-select: text;
+  -webkit-user-drag: none;
+  cursor: text;
+}
+
 /* Confetti Cannon Burst Animation - Replace the existing @keyframes in your globals.css */
 
 @keyframes confetti-burst {
