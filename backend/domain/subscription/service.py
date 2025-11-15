@@ -396,6 +396,16 @@ class SubscriptionService:
         subscription = self.get_current_subscription()
         return subscription.get_features().model_dump()
     
+    async def get_current_limits_async(self) -> Dict[str, Any]:
+        """
+        Get feature flags for current tier (async version)
+        
+        Returns:
+            Feature flags dictionary
+        """
+        subscription = await self.get_current_subscription_async()
+        return subscription.get_features().model_dump()
+    
     async def get_remaining_queries(self) -> Dict[str, Any]:
         """
         Get remaining query quotas

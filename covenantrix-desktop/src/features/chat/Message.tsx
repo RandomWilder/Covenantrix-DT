@@ -10,11 +10,15 @@ import { useClipboard } from '../../hooks/useClipboard'
 interface MessageProps {
   message: MessageType
   isStreaming?: boolean
+  hasDocumentContext?: boolean
 }
 
-export const Message: React.FC<MessageProps> = ({ message, isStreaming = false }) => {
+export const Message: React.FC<MessageProps> = ({ message, isStreaming = false, hasDocumentContext = false }) => {
   // Detect text direction for the message content
   const textDirection = detectTextDirection(message.content)
+  
+  // Determine loading text based on context
+  const loadingText = hasDocumentContext ? 'Analyzing your documents...' : 'Thinking...'
   
   // Clipboard hook for copy functionality
   const { copied, copyToClipboard } = useClipboard()
@@ -70,7 +74,7 @@ export const Message: React.FC<MessageProps> = ({ message, isStreaming = false }
           ) : (message.isStreaming || isStreaming) && !message.content ? (
             <div className="flex items-center gap-2 text-gray-500 dark:text-gray-400">
               <Loader2 className="w-4 h-4 animate-spin" />
-              <span>Thinking...</span>
+              <span>{loadingText}</span>
             </div>
           ) : (
             <>

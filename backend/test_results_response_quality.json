@@ -1,0 +1,326 @@
+{
+  "timestamp": "2025-11-15T11:23:53.118170",
+  "summary": {
+    "total_tests": 5,
+    "successful_tests": 5,
+    "quality_dimensions": {
+      "non_empty_response": {
+        "passed": 5,
+        "total": 5
+      },
+      "correct_mode_selection": {
+        "passed": 5,
+        "total": 5
+      },
+      "document_filtering_flag": {
+        "passed": 5,
+        "total": 5
+      },
+      "legal_context_present": {
+        "passed": 5,
+        "total": 5
+      },
+      "no_hallucination": {
+        "passed": 5,
+        "total": 5
+      },
+      "uncertainty_handling": {
+        "passed": 5,
+        "total": 5
+      },
+      "professional_tone": {
+        "passed": 5,
+        "total": 5
+      },
+      "appropriate_length": {
+        "passed": 5,
+        "total": 5
+      }
+    }
+  },
+  "test_results": [
+    {
+      "query": "What is the rent amount mentioned in the document?",
+      "expected_behavior": "Should analyze document and cite specific rent amount or state if not found",
+      "document_ids": [
+        "6fed109a-cc68-4fd1-b478-556135a03ce1"
+      ],
+      "expected_prompt_type": "document_query",
+      "success": true,
+      "error": "",
+      "response": "The document you provided does not mention any rent amount. It primarily focuses on the option agreement for purchasing a residential property, specifically outlining terms related to the purchase of a 5-room apartment and associated fees and payment schedules. If you have any specific questions about the document or need clarification on different aspects, feel free to ask!",
+      "mode": "naive",
+      "document_filtered": true,
+      "duration_ms": 2418.863,
+      "analysis": {
+        "non_empty_response": {
+          "passed": true,
+          "description": "Response contains content",
+          "details": "Length: 377 characters"
+        },
+        "correct_mode_selection": {
+          "passed": true,
+          "description": "Mode should be 'naive' for document-specific query",
+          "details": "Actual mode: naive"
+        },
+        "document_filtering_flag": {
+          "passed": true,
+          "description": "Document filtering flag matches query scope",
+          "details": "Expected: True, Actual: True"
+        },
+        "legal_context_present": {
+          "passed": true,
+          "description": "Response contains legal/property context",
+          "details": "Found legal terminology: True"
+        },
+        "no_hallucination": {
+          "passed": true,
+          "description": "Document query can reference documents",
+          "details": "Appropriate context for document references"
+        },
+        "uncertainty_handling": {
+          "passed": true,
+          "description": "System can express uncertainty",
+          "details": "Uncertainty expressed: False"
+        },
+        "professional_tone": {
+          "passed": true,
+          "description": "Response maintains professional tone",
+          "details": "Professional language: True"
+        },
+        "appropriate_length": {
+          "passed": true,
+          "description": "Response length is reasonable (50-5000 chars)",
+          "details": "Length: 377 characters"
+        }
+      },
+      "timestamp": "2025-11-15T11:23:37.293482"
+    },
+    {
+      "query": "What are best practices for property lease agreements?",
+      "expected_behavior": "Should provide general legal advice, clearly stating it's not from specific documents",
+      "document_ids": null,
+      "expected_prompt_type": "general_query",
+      "success": true,
+      "error": "",
+      "response": "I do not have enough information to answer your question about the best practices for property lease agreements. The provided context primarily focuses on specific legal documents related to property purchase agreements and associated entities. If you have any questions about the details within that context or need clarification about the entities or relationships depicted, feel free to ask! \n\n### References\nNo references applicable as no information was found in the Knowledge Base.",
+      "mode": "mix",
+      "document_filtered": false,
+      "duration_ms": 10.485,
+      "analysis": {
+        "non_empty_response": {
+          "passed": true,
+          "description": "Response contains content",
+          "details": "Length: 487 characters"
+        },
+        "correct_mode_selection": {
+          "passed": true,
+          "description": "Mode should be hybrid/mix for global query",
+          "details": "Actual mode: mix"
+        },
+        "document_filtering_flag": {
+          "passed": true,
+          "description": "Document filtering flag matches query scope",
+          "details": "Expected: False, Actual: False"
+        },
+        "legal_context_present": {
+          "passed": true,
+          "description": "Response contains legal/property context",
+          "details": "Found legal terminology: True"
+        },
+        "no_hallucination": {
+          "passed": true,
+          "description": "General query should not claim document-specific info",
+          "details": "Found document claims in general query: False"
+        },
+        "uncertainty_handling": {
+          "passed": true,
+          "description": "System can express uncertainty",
+          "details": "Uncertainty expressed: True"
+        },
+        "professional_tone": {
+          "passed": true,
+          "description": "Response maintains professional tone",
+          "details": "Professional language: True"
+        },
+        "appropriate_length": {
+          "passed": true,
+          "description": "Response length is reasonable (50-5000 chars)",
+          "details": "Length: 487 characters"
+        }
+      },
+      "timestamp": "2025-11-15T11:23:37.307551"
+    },
+    {
+      "query": "What is the property's current market value?",
+      "expected_behavior": "Should search document, likely not find info, and express uncertainty clearly",
+      "document_ids": [
+        "6fed109a-cc68-4fd1-b478-556135a03ce1"
+      ],
+      "expected_prompt_type": "document_query",
+      "success": true,
+      "error": "",
+      "response": "The document provided does not specify the current market value of the property in question. It only mentions the price for the apartment option being offered, which is 7,862,500 ₪ including VAT, with a total purchase price of 7,962,778 ₪ including additional fees. \n\nFor an accurate assessment of the current market value, you may need to consult a professional appraiser or real estate agent familiar with the area and current market conditions. If further assistance is required, feel free to ask!",
+      "mode": "naive",
+      "document_filtered": true,
+      "duration_ms": 4318.075000000001,
+      "analysis": {
+        "non_empty_response": {
+          "passed": true,
+          "description": "Response contains content",
+          "details": "Length: 500 characters"
+        },
+        "correct_mode_selection": {
+          "passed": true,
+          "description": "Mode should be 'naive' for document-specific query",
+          "details": "Actual mode: naive"
+        },
+        "document_filtering_flag": {
+          "passed": true,
+          "description": "Document filtering flag matches query scope",
+          "details": "Expected: True, Actual: True"
+        },
+        "legal_context_present": {
+          "passed": true,
+          "description": "Response contains legal/property context",
+          "details": "Found legal terminology: True"
+        },
+        "no_hallucination": {
+          "passed": true,
+          "description": "Document query can reference documents",
+          "details": "Appropriate context for document references"
+        },
+        "uncertainty_handling": {
+          "passed": true,
+          "description": "System can express uncertainty",
+          "details": "Uncertainty expressed: False"
+        },
+        "professional_tone": {
+          "passed": true,
+          "description": "Response maintains professional tone",
+          "details": "Professional language: True"
+        },
+        "appropriate_length": {
+          "passed": true,
+          "description": "Response length is reasonable (50-5000 chars)",
+          "details": "Length: 500 characters"
+        }
+      },
+      "timestamp": "2025-11-15T11:23:41.644023"
+    },
+    {
+      "query": "Can I increase the rent during the lease term?",
+      "expected_behavior": "Should act as legal counsel for property owner, reference relevant clauses if present",
+      "document_ids": [
+        "6fed109a-cc68-4fd1-b478-556135a03ce1"
+      ],
+      "expected_prompt_type": "document_query",
+      "success": true,
+      "error": "",
+      "response": "To provide you with accurate advice regarding whether you can increase the rent during the lease term, I need to clarify your perspective. Are you asking from the standpoint of a property owner or a renter? Please specify so I can offer the most relevant guidance according to your situation.",
+      "mode": "naive",
+      "document_filtered": true,
+      "duration_ms": 1864.069,
+      "analysis": {
+        "non_empty_response": {
+          "passed": true,
+          "description": "Response contains content",
+          "details": "Length: 292 characters"
+        },
+        "correct_mode_selection": {
+          "passed": true,
+          "description": "Mode should be 'naive' for document-specific query",
+          "details": "Actual mode: naive"
+        },
+        "document_filtering_flag": {
+          "passed": true,
+          "description": "Document filtering flag matches query scope",
+          "details": "Expected: True, Actual: True"
+        },
+        "legal_context_present": {
+          "passed": true,
+          "description": "Response contains legal/property context",
+          "details": "Found legal terminology: True"
+        },
+        "no_hallucination": {
+          "passed": true,
+          "description": "Document query can reference documents",
+          "details": "Appropriate context for document references"
+        },
+        "uncertainty_handling": {
+          "passed": true,
+          "description": "System can express uncertainty",
+          "details": "Uncertainty expressed: False"
+        },
+        "professional_tone": {
+          "passed": true,
+          "description": "Response maintains professional tone",
+          "details": "Professional language: True"
+        },
+        "appropriate_length": {
+          "passed": true,
+          "description": "Response length is reasonable (50-5000 chars)",
+          "details": "Length: 292 characters"
+        }
+      },
+      "timestamp": "2025-11-15T11:23:43.518583"
+    },
+    {
+      "query": "Summarize the key terms and obligations in this agreement",
+      "expected_behavior": "Should provide structured summary based on document content",
+      "document_ids": [
+        "6fed109a-cc68-4fd1-b478-556135a03ce1"
+      ],
+      "expected_prompt_type": "document_query",
+      "success": true,
+      "error": "",
+      "response": "Here's a summary of the key terms and obligations in the option agreement between Gindi Israel 2010 Ltd. and Moshe Shai:\n\n1. **Parties Involved**: \n   - Gindi Israel 2010 Ltd. (the \"Company\") \n   - Moshe Shai (the \"Option Recipient\")\n\n2. **Property Details**:\n   - The option recipient is interested in a 5-room apartment located in a project on land identified as Plot 2255 in Tel Aviv.\n\n3. **Option Grant**:\n   - The Company grants the option recipient the right to purchase full leasehold rights to the apartment as per the terms of a subsequent sale agreement.\n   - The purchase price is set at 7,862,500 NIS with additional fees that result in a total price of 7,962,778 NIS, which may be subject to indexation according to specific terms.\n\n4. **Option Validity Period**:\n   - The option period begins at the signing of the agreement and lasts until 30 days post-delivery of plans and specifications for the apartment or 18 months from the signing date, whichever comes sooner.\n   - If the option is not exercised within the stipulated timeframe, it will lapse without reimbursement.\n\n5. **Cancellation Rights**:\n   - The option recipient can cancel the option within 30 days of receiving plans if specific material changes occur regarding the property (such as significant changes in apartment size or location).\n   - Failure to provide notice within the specified timeframe results in the termination of cancellation rights.\n\n6. **Payment Structure**:\n   - The option recipient must pay a total of 746,938 NIS for the option in two installments:\n     - 7% of the purchase price upon signing.\n     - 2.5% of the purchase price shortly after, both via designated bank accounts (trust accounts).\n\n7. **Obligations upon Exercise of the Option**:\n   - The option recipient must deliver a purchase notice and sign the sale agreement within 30 days of receiving the plans.\n   - Upon exercising the option, the recipient must provide full payment as outlined.\n\n8. **Default Provisions**:\n   - Failure to meet payment obligations by the specified deadline allows the Company to cancel the agreement without refunding any payments made.\n   - The Company retains the right to sell the option to third parties if it lapses.\n\n9. **Tax Obligations**:\n   - The company is responsible for income tax associated with granting the option, while the option recipient is responsible for purchase tax and other relevant taxes.\n\nThis summary captures the main points of the option agreement and the obligations of both parties. If there are specific sections you wish to delve deeper into, please let me know!",
+      "mode": "naive",
+      "document_filtered": true,
+      "duration_ms": 9575.360999999999,
+      "analysis": {
+        "non_empty_response": {
+          "passed": true,
+          "description": "Response contains content",
+          "details": "Length: 2594 characters"
+        },
+        "correct_mode_selection": {
+          "passed": true,
+          "description": "Mode should be 'naive' for document-specific query",
+          "details": "Actual mode: naive"
+        },
+        "document_filtering_flag": {
+          "passed": true,
+          "description": "Document filtering flag matches query scope",
+          "details": "Expected: True, Actual: True"
+        },
+        "legal_context_present": {
+          "passed": true,
+          "description": "Response contains legal/property context",
+          "details": "Found legal terminology: True"
+        },
+        "no_hallucination": {
+          "passed": true,
+          "description": "Document query can reference documents",
+          "details": "Appropriate context for document references"
+        },
+        "uncertainty_handling": {
+          "passed": true,
+          "description": "System can express uncertainty",
+          "details": "Uncertainty expressed: False"
+        },
+        "professional_tone": {
+          "passed": true,
+          "description": "Response maintains professional tone",
+          "details": "Professional language: True"
+        },
+        "appropriate_length": {
+          "passed": true,
+          "description": "Response length is reasonable (50-5000 chars)",
+          "details": "Length: 2594 characters"
+        }
+      },
+      "timestamp": "2025-11-15T11:23:53.095563"
+    }
+  ]
+}

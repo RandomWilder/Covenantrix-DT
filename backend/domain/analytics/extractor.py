@@ -19,8 +19,8 @@ class MetadataExtractor:
     """
     
     # Chunking configuration
-    CHUNK_SIZE = 2000  # characters
-    CHUNK_OVERLAP = 500  # characters
+    CHUNK_SIZE = 2400  # characters (optimized for large documents - was 2000)
+    CHUNK_OVERLAP = 300  # characters (reduced from 500 to avoid redundancy)
     
     def __init__(self, llm_func: Callable[[str, str], Awaitable[str]]):
         """

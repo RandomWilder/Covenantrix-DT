@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 
 class UserSettingsStorage:
     """
-    User settings storage service
+    User settings storage service with in-memory caching
     Handles loading, saving, and migration of user settings
     """
     
@@ -30,18 +30,32 @@ class UserSettingsStorage:
         
         # Ensure storage directory exists
         self.storage_path.parent.mkdir(parents=True, exist_ok=True)
+        
+        # In-memory cache for settings
+        self._cached_settings: Optional[UserSettings] = None
+        self._cache_timestamp: Optional[datetime] = None
+        self._cache_ttl_seconds = 10  # Cache for 10 seconds
     
     async def load_settings(self) -> UserSettings:
         """
-        Load user settings from storage
+        Load user settings from storage with in-memory caching
         
         Returns:
             User settings object
         """
+        # Check cache first
+        if self._is_cache_valid():
+            logger.debug("Returning cached settings")
+            return self._cached_settings
+        
         try:
             if not self.storage_path.exists():
                 logger.info("No settings file found, creating defaults")
-                return await self._create_default_settings()
+                default_settings = await self._create_default_settings()
+                # Cache the default settings
+                self._cached_settings = default_settings
+                self._cache_timestamp = datetime.utcnow()
+                return default_settings
             
             with open(self.storage_path, 'r', encoding='utf-8') as f:
                 data = json.load(f)
@@ -65,12 +79,20 @@ class UserSettingsStorage:
             # Create settings object
             settings = UserSettings(**migrated_data)
             
+            # Update cache
+            self._cached_settings = settings
+            self._cache_timestamp = datetime.utcnow()
+            
             logger.info("Settings loaded successfully")
             return settings
             
         except json.JSONDecodeError as e:
             logger.error(f"Invalid JSON in settings file: {e}")
-            return await self._create_default_settings()
+            default_settings = await self._create_default_settings()
+            # Cache the default settings
+            self._cached_settings = default_settings
+            self._cache_timestamp = datetime.utcnow()
+            return default_settings
         except Exception as e:
             logger.error(f"Failed to load settings: {e}")
             raise StorageError(
@@ -80,7 +102,7 @@ class UserSettingsStorage:
     
     async def save_settings(self, settings: UserSettings) -> None:
         """
-        Save user settings to storage
+        Save user settings to storage and invalidate cache
         
         Args:
             settings: User settings to save
@@ -99,6 +121,10 @@ class UserSettingsStorage:
             with open(self.storage_path, 'w', encoding='utf-8') as f:
                 json.dump(settings_dict, f, indent=2, ensure_ascii=False)
             
+            # Invalidate cache after save
+            self._cached_settings = None
+            self._cache_timestamp = None
+            
             logger.info("Settings saved successfully")
             
         except Exception as e:
@@ -107,6 +133,24 @@ class UserSettingsStorage:
                 f"Failed to save user settings: {str(e)}",
                 details={"storage_path": str(self.storage_path)}
             )
+    
+    def _is_cache_valid(self) -> bool:
+        """
+        Check if cached settings are still valid
+        
+        Returns:
+            True if cache is valid, False otherwise
+        """
+        if self._cached_settings is None or self._cache_timestamp is None:
+            return False
+        
+        age_seconds = (datetime.utcnow() - self._cache_timestamp).total_seconds()
+        is_valid = age_seconds < self._cache_ttl_seconds
+        
+        if not is_valid:
+            logger.debug(f"Cache expired (age: {age_seconds:.1f}s)")
+        
+        return is_valid
     
     async def _create_default_settings(self) -> UserSettings:
         """Create default settings"""

@@ -95,7 +95,7 @@ async def upload_document(
         
         # NEW: Check file size against tier limit
         file_size_mb = len(content) / (1024 * 1024)
-        tier_limits = subscription_service.get_current_limits()
+        tier_limits = await subscription_service.get_current_limits_async()
         current_subscription = await subscription_service.get_current_subscription_async()
         
         if file_size_mb > tier_limits["max_doc_size_mb"]:
@@ -191,8 +191,8 @@ async def upload_documents_stream(
     # NEW: Get subscription service for limit checks
     from core.dependencies import get_subscription_service
     subscription_service = get_subscription_service()
-    tier_limits = subscription_service.get_current_limits()
     current_subscription = await subscription_service.get_current_subscription_async()
+    tier_limits = await subscription_service.get_current_limits_async()
     
     # CRITICAL: Read all file contents BEFORE creating the generator
     # FastAPI closes UploadFile objects when the route function returns,
@@ -239,193 +239,318 @@ async def upload_documents_stream(
         file_sizes_mb.append(file_size_mb)
     
     async def generate_progress_stream():
-        """Generate SSE stream with progress updates"""
+        """Generate SSE stream with PARALLEL processing and isolated failure handling"""
         try:
             total_files = len(file_contents)
+            completed_files = 0
+            successful_files = 0
+            failed_files = 0
             
-            for file_index, (content, filename, file_size_mb) in enumerate(zip(file_contents, filenames, file_sizes_mb)):
-                try:
-                    # NEW: Check if upload is allowed for this document
-                    can_upload, reason = await subscription_service.check_upload_allowed()
-                    if not can_upload:
-                        # Emit failure event
-                        progress_event = DocumentProgressEvent(
-                            filename=filename,
-                            document_id=None,
-                            stage=DocumentProgressStage.FAILED,
-                            message=reason,
-                            progress_percent=0,
-                            timestamp=datetime.utcnow().isoformat(),
-                            error=reason
+            # Shared queue for all progress events from parallel tasks
+            shared_progress_queue = asyncio.Queue()
+            
+            # Semaphore to limit concurrent document processing (max 2)
+            # This controls upload + text extraction parallelism
+            processing_semaphore = asyncio.Semaphore(2)
+            
+            # CRITICAL: Semaphore for RAG engine operations (max 1)
+            # LightRAG has internal queueing that returns immediately when a document is queued
+            # We MUST ensure only ONE document enters RAG at a time to avoid state inconsistencies
+            rag_insert_semaphore = asyncio.Semaphore(1)
+            
+            # Track document results
+            document_results = {}
+            
+            async def process_single_document(file_index: int, content: bytes, filename: str, file_size_mb: float):
+                """Process a single document with isolated error handling and timeout"""
+                nonlocal completed_files, successful_files, failed_files
+                
+                async with processing_semaphore:
+                    document_id = None
+                    try:
+                        # Check if upload is allowed for this document
+                        can_upload, reason = await subscription_service.check_upload_allowed()
+                        if not can_upload:
+                            # Put failure event in shared queue
+                            await shared_progress_queue.put({
+                                'type': 'progress',
+                                'file_index': file_index,
+                                'filename': filename,
+                                'document_id': None,
+                                'stage': DocumentProgressStage.FAILED,
+                                'message': reason,
+                                'percent': 0,
+                                'error': reason
+                            })
+                            document_results[file_index] = {'success': False, 'error': reason}
+                            return
+                        
+                        # Stage 1: Initializing (10%)
+                        await shared_progress_queue.put({
+                            'type': 'progress',
+                            'file_index': file_index,
+                            'filename': filename,
+                            'document_id': None,
+                            'stage': DocumentProgressStage.INITIALIZING,
+                            'message': service.STAGE_MESSAGES["initializing"],
+                            'percent': 10
+                        })
+                        
+                        # Upload document
+                        document = await service.upload_document(
+                            file_content=content,
+                            filename=filename
                         )
+                        document_id = document.id
+                        
+                        # Stage 2: Reading (25%)
+                        await shared_progress_queue.put({
+                            'type': 'progress',
+                            'file_index': file_index,
+                            'filename': filename,
+                            'document_id': document_id,
+                            'stage': DocumentProgressStage.READING,
+                            'message': service.STAGE_MESSAGES["reading"],
+                            'percent': 25
+                        })
+                        
+                        # Extract text
+                        processor = DocumentProcessor(ocr_service=ocr_service)
+                        start_time = time.time()
+                        extracted_text = await processor.extract_text(content, filename)
+                        
+                        # Validate content
+                        if not processor.validate_content(extracted_text):
+                            raise ValueError("Extracted content quality is too low")
+                        
+                        ocr_used = processor.ocr_used
+                        
+                        # Progress tracking for smart timeout
+                        last_progress_time = {'time': time.time()}
+                        
+                        # Create document-specific progress callback
+                        async def document_progress_callback(stage: str, percent: int):
+                            """Forward progress to shared queue with document context"""
+                            # Update last progress time - this resets the timeout
+                            last_progress_time['time'] = time.time()
+                            
+                            # Get actual message from registry (includes rotating messages)
+                            registry_data = await service.registry.get_document(document_id)
+                            processing_data = registry_data.get('processing', {}) if registry_data else {}
+                            actual_message = processing_data.get('message', service.STAGE_MESSAGES.get(stage, "Processing..."))
+                            
+                            await shared_progress_queue.put({
+                                'type': 'progress',
+                                'file_index': file_index,
+                                'filename': filename,
+                                'document_id': document_id,
+                                'stage': DocumentProgressStage(stage),
+                                'message': actual_message,
+                                'percent': percent
+                            })
+                        
+                        # CRITICAL: Acquire RAG semaphore before processing
+                        # This ensures only ONE document at a time enters LightRAG
+                        # Prevents "Request queued" race condition where ainsert() returns immediately
+                        async with rag_insert_semaphore:
+                            # SMART TIMEOUT: Only timeout if no progress for 5 minutes
+                            # This allows large documents (300+ pages) to process without time limits
+                            # as long as they're making progress (chunks being extracted)
+                            try:
+                                # Create the processing task
+                                processing_task = asyncio.create_task(
+                                    service.process_document(
+                                        document_id=document_id,
+                                        extracted_content=extracted_text,
+                                        processing_time=time.time() - start_time,
+                                        ocr_applied=ocr_used,
+                                        progress_callback=document_progress_callback
+                                    )
+                                )
+                                
+                                # Monitor task with progress-based timeout
+                                inactivity_timeout = 300.0  # 5 minutes of no progress = stuck
+                                check_interval = 10.0  # Check every 10 seconds
+                                
+                                while not processing_task.done():
+                                    try:
+                                        # Wait for task completion, but check periodically
+                                        await asyncio.wait_for(
+                                            asyncio.shield(processing_task),
+                                            timeout=check_interval
+                                        )
+                                    except asyncio.TimeoutError:
+                                        # Check interval expired, verify progress
+                                        time_since_progress = time.time() - last_progress_time['time']
+                                        
+                                        if time_since_progress > inactivity_timeout:
+                                            # No progress for 5 minutes - process is stuck
+                                            processing_task.cancel()
+                                            raise asyncio.TimeoutError(
+                                                f"No progress for {inactivity_timeout}s - process appears stuck"
+                                            )
+                                        # else: Progress detected, continue monitoring
+                                
+                                # Task completed successfully, get result
+                                await processing_task
+                            
+                                # Enhanced document recording with tier and format context
+                                file_extension = filename.split('.')[-1].lower() if '.' in filename else 'unknown'
+                                await subscription_service.usage_tracker.record_document_upload(
+                                    doc_id=document_id,
+                                    size_mb=file_size_mb,
+                                    tier_at_upload=current_subscription.tier,
+                                    format=file_extension
+                                )
+                                
+                                # Success!
+                                document_results[file_index] = {
+                                    'success': True,
+                                    'document_id': document_id,
+                                    'filename': filename
+                                }
+                                successful_files += 1
+                                logger.info(f"Document uploaded and processed: {document_id} ({filename})")
+                                
+                            except asyncio.TimeoutError as e:
+                                # Document-level timeout - mark as failed but continue with others
+                                error_msg = "Processing stalled - no progress detected for 5 minutes. The process may be stuck."
+                                logger.warning(f"Document processing timeout (inactivity) for {filename} ({document_id}): {str(e)}")
+                                
+                                # Mark document as failed in registry
+                                await service.registry.update_status(
+                                    document_id=document_id,
+                                    status="failed",
+                                    processing_info={'error': error_msg}
+                                )
+                                
+                                await shared_progress_queue.put({
+                                    'type': 'progress',
+                                    'file_index': file_index,
+                                    'filename': filename,
+                                    'document_id': document_id,
+                                    'stage': DocumentProgressStage.FAILED,
+                                    'message': service.STAGE_MESSAGES["failed"],
+                                    'percent': 0,
+                                    'error': error_msg
+                                })
+                                
+                                document_results[file_index] = {
+                                    'success': False,
+                                    'error': error_msg,
+                                    'filename': filename
+                                }
+                                failed_files += 1
+                        
+                    except Exception as e:
+                        error_msg = str(e)
+                        logger.error(f"Document processing failed for {filename}: {error_msg}")
+                        
+                        # If document was created, mark as failed
+                        if document_id:
+                            try:
+                                await service.registry.update_status(
+                                    document_id=document_id,
+                                    status="failed",
+                                    processing_info={'error': error_msg}
+                                )
+                            except:
+                                pass  # Registry update failed, continue
+                        
+                        # Emit failure event
+                        await shared_progress_queue.put({
+                            'type': 'progress',
+                            'file_index': file_index,
+                            'filename': filename,
+                            'document_id': document_id,
+                            'stage': DocumentProgressStage.FAILED,
+                            'message': service.STAGE_MESSAGES["failed"],
+                            'percent': 0,
+                            'error': error_msg
+                        })
+                        
+                        document_results[file_index] = {
+                            'success': False,
+                            'error': error_msg,
+                            'filename': filename
+                        }
+                        failed_files += 1
+                    
+                    finally:
+                        completed_files += 1
+                        # Signal completion for this document
+                        await shared_progress_queue.put({
+                            'type': 'document_complete',
+                            'file_index': file_index,
+                            'filename': filename
+                        })
+            
+            # Create tasks for ALL documents (they'll process in parallel up to semaphore limit)
+            processing_tasks = []
+            for file_index, (content, filename, file_size_mb) in enumerate(zip(file_contents, filenames, file_sizes_mb)):
+                task = asyncio.create_task(
+                    process_single_document(file_index, content, filename, file_size_mb)
+                )
+                processing_tasks.append(task)
+            
+            # Monitor progress and yield events as they arrive
+            while completed_files < total_files:
+                try:
+                    # Wait for next progress event (with timeout to check completion status)
+                    event = await asyncio.wait_for(shared_progress_queue.get(), timeout=0.5)
+                    
+                    if event['type'] == 'progress':
+                        # Create and yield progress event
+                        progress_event = DocumentProgressEvent(
+                            filename=event['filename'],
+                            document_id=event.get('document_id'),
+                            stage=event['stage'],
+                            message=event['message'],
+                            progress_percent=event['percent'],
+                            timestamp=datetime.utcnow().isoformat(),
+                            error=event.get('error')
+                        )
+                        
+                        # Calculate overall progress based on completed files
+                        overall_progress = int((completed_files / total_files) * 100)
+                        
                         batch_event = BatchProgressEvent(
                             total_files=total_files,
-                            current_file_index=file_index,
+                            current_file_index=event['file_index'],
                             file_progress=progress_event,
-                            overall_progress_percent=int(((file_index + 1) / total_files) * 100)
+                            overall_progress_percent=overall_progress
                         )
+                        
                         yield f"data: {batch_event.model_dump_json()}\n\n"
-                        continue
                     
-                    # Stage 1: Initializing (10%)
-                    progress_event = DocumentProgressEvent(
-                        filename=filename,
-                        document_id=None,
-                        stage=DocumentProgressStage.INITIALIZING,
-                        message=service.STAGE_MESSAGES["initializing"],
-                        progress_percent=10,
-                        timestamp=datetime.utcnow().isoformat()
-                    )
-                    batch_event = BatchProgressEvent(
-                        total_files=total_files,
-                        current_file_index=file_index,
-                        file_progress=progress_event,
-                        overall_progress_percent=int((file_index / total_files) * 100)
-                    )
-                    yield f"data: {batch_event.model_dump_json()}\n\n"
-                    
-                    # Upload document
-                    document = await service.upload_document(
-                        file_content=content,
-                        filename=filename
-                    )
-                    
-                    # Stage 2: Reading (with OCR if needed)
-                    progress_event = DocumentProgressEvent(
-                        filename=filename,
-                        document_id=document.id,
-                        stage=DocumentProgressStage.READING,
-                        message=service.STAGE_MESSAGES["reading"],
-                        progress_percent=25,
-                        timestamp=datetime.utcnow().isoformat()
-                    )
-                    batch_event.file_progress = progress_event
-                    yield f"data: {batch_event.model_dump_json()}\n\n"
-                    
-                    # Extract text
-                    processor = DocumentProcessor(ocr_service=ocr_service)
-                    start_time = time.time()
-                    extracted_text = await processor.extract_text(content, filename)
-                    
-                    # Validate content
-                    if not processor.validate_content(extracted_text):
-                        raise ValueError("Extracted content quality is too low")
-                    
-                    # Get OCR usage from processor
-                    ocr_used = processor.ocr_used
-                    
-                    # Create progress queue for streaming updates from service
-                    progress_queue = asyncio.Queue()
-                    
-                    async def queue_callback(stage: str, percent: int):
-                        """Callback that puts progress events into queue"""
-                        await progress_queue.put({
-                            'stage': stage,
-                            'percent': percent
-                        })
-                    
-                    # Run processing in background task
-                    process_task = asyncio.create_task(
-                        service.process_document(
-                            document_id=document.id,
-                            extracted_content=extracted_text,
-                            processing_time=time.time() - start_time,
-                            ocr_applied=ocr_used,
-                            progress_callback=queue_callback
-                        )
-                    )
-                    
-                    # Yield progress events from queue until processing completes
-                    while not process_task.done():
-                        try:
-                            event = await asyncio.wait_for(progress_queue.get(), timeout=0.1)
-                            
-                            # Get actual message from registry (includes rotating messages)
-                            registry_data = await service.registry.get_document(document.id)
-                            processing_data = registry_data.get('processing', {}) if registry_data else {}
-                            actual_message = processing_data.get('message', service.STAGE_MESSAGES.get(event['stage'], "Processing..."))
-                            
-                            # Create progress event from service callback
-                            progress_event = DocumentProgressEvent(
-                                filename=filename,
-                                document_id=document.id,
-                                stage=DocumentProgressStage(event['stage']),
-                                message=actual_message,
-                                progress_percent=event['percent'],
-                                timestamp=datetime.utcnow().isoformat()
-                            )
-                            
-                            # Calculate overall progress
-                            file_progress = (file_index + (event['percent'] / 100)) / total_files
-                            batch_event.file_progress = progress_event
-                            batch_event.overall_progress_percent = int(file_progress * 100)
-                            
-                            yield f"data: {batch_event.model_dump_json()}\n\n"
-                            
-                        except asyncio.TimeoutError:
-                            continue
-                    
-                    # Wait for task completion and check for exceptions
-                    await process_task
-                    
-                    # Enhanced document recording with tier and format context
-                    file_extension = filename.split('.')[-1].lower() if '.' in filename else 'unknown'
-                    await subscription_service.usage_tracker.record_document_upload(
-                        doc_id=document.id,
-                        size_mb=file_size_mb,
-                        tier_at_upload=current_subscription.tier,
-                        format=file_extension
-                    )
-                    
-                    # Drain remaining events from queue
-                    while not progress_queue.empty():
-                        try:
-                            event = progress_queue.get_nowait()
-                            
-                            # Get actual message from registry (includes rotating messages)
-                            registry_data = await service.registry.get_document(document.id)
-                            processing_data = registry_data.get('processing', {}) if registry_data else {}
-                            actual_message = processing_data.get('message', service.STAGE_MESSAGES.get(event['stage'], "Processing..."))
-                            
-                            progress_event = DocumentProgressEvent(
-                                filename=filename,
-                                document_id=document.id,
-                                stage=DocumentProgressStage(event['stage']),
-                                message=actual_message,
-                                progress_percent=event['percent'],
-                                timestamp=datetime.utcnow().isoformat()
-                            )
-                            batch_event.file_progress = progress_event
-                            batch_event.overall_progress_percent = int(((file_index + 1) / total_files) * 100)
-                            yield f"data: {batch_event.model_dump_json()}\n\n"
-                        except asyncio.QueueEmpty:
-                            break
-                    
-                    logger.info(f"Document uploaded and processed: {document.id}")
-                    
-                except Exception as e:
-                    logger.error(f"Document processing failed for {filename}: {e}")
-                    
-                    # Emit failure event
-                    progress_event = DocumentProgressEvent(
-                        filename=filename,
-                        document_id=None,
-                        stage=DocumentProgressStage.FAILED,
-                        message=service.STAGE_MESSAGES["failed"],
-                        progress_percent=0,
-                        timestamp=datetime.utcnow().isoformat(),
-                        error=str(e)
-                    )
-                    batch_event = BatchProgressEvent(
-                        total_files=total_files,
-                        current_file_index=file_index,
-                        file_progress=progress_event,
-                        overall_progress_percent=int(((file_index + 1) / total_files) * 100)
-                    )
-                    yield f"data: {batch_event.model_dump_json()}\n\n"
+                    elif event['type'] == 'document_complete':
+                        # Document completed, update overall progress
+                        overall_progress = int((completed_files / total_files) * 100)
+                        logger.debug(f"Document {event['file_index']}/{total_files} completed. Overall: {overall_progress}%")
+                
+                except asyncio.TimeoutError:
+                    # No events in queue, just continue checking
+                    continue
+            
+            # Wait for all tasks to complete (should already be done)
+            await asyncio.gather(*processing_tasks, return_exceptions=True)
+            
+            # Emit final summary
+            summary = {
+                'type': 'batch_complete',
+                'total_files': total_files,
+                'successful': successful_files,
+                'failed': failed_files,
+                'timestamp': datetime.utcnow().isoformat()
+            }
+            yield f"data: {json.dumps(summary)}\n\n"
+            
+            logger.info(f"Batch upload completed: {successful_files}/{total_files} successful, {failed_files} failed")
             
         except Exception as e:
             logger.error(f"Streaming upload failed: {e}")
+            import traceback
+            logger.error(traceback.format_exc())
             error_event = {
                 "error": "Internal server error",
                 "detail": str(e)

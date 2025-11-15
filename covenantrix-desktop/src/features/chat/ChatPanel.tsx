@@ -70,7 +70,11 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ width, disabled = false })
         {activeConversation ? (
           activeConversation.messages.length > 0 ? (
             activeConversation.messages.map((message) => (
-              <Message key={message.id} message={message} />
+              <Message 
+                key={message.id} 
+                message={message} 
+                hasDocumentContext={selectedDocuments.length > 0}
+              />
             ))
           ) : (
             <div className="flex-1 flex items-center justify-center text-gray-500 dark:text-gray-400">

@@ -188,5 +188,3 @@ class DocumentChunkMapper:
             f"non-empty docs: {sum(1 for v in per_doc.values() if v)}"
         )
         return dedup_all, per_doc
-
-
