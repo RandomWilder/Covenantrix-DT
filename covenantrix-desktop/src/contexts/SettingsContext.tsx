@@ -346,7 +346,7 @@ function getDefaultSettings(): UserSettings {
       top_k: 5,
       use_reranking: true,
       enable_ocr: true,
-      llm_model: 'gpt-4o-mini'
+      llm_model: 'gpt-5-mini'
     },
     language: {
       preferred: 'en',

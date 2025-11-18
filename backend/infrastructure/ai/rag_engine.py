@@ -76,6 +76,10 @@ class RAGEngine:
         # Store user settings for configuration
         self.user_settings = user_settings or {}
         
+        # Track operation context for model selection
+        # Possible values: "entity_extraction", "chat_query", None
+        self._current_operation_context: Optional[str] = None
+        
         logger.info(f"[OK] RAG Engine created with API key (length: {len(self.api_key)})")
     
     def _create_embedding_func(self):
@@ -102,13 +106,8 @@ class RAGEngine:
         )
     
     def _create_llm_func(self):
-        """Create LLM function for LightRAG"""
+        """Create LLM function for LightRAG with GPT-5 reasoning model support"""
         from openai import AsyncOpenAI
-        
-        # Configure client timeout for LLM generations
-        # Reduced to 30s - if a single API call takes longer, OpenAI has issues
-        # Document-level timeout (180s) allows for multiple retries
-        client = AsyncOpenAI(api_key=self.api_key, timeout=30.0)
         
         async def llm_func(
             prompt: str,
@@ -120,7 +119,28 @@ class RAGEngine:
             Generate completion using OpenAI
             
             Note: Filters out LightRAG-internal parameters before calling OpenAI API
+            Supports GPT-5 reasoning models with dynamic timeout and parameter filtering
             """
+            # Detect operation context for model selection
+            operation_context = getattr(self, '_current_operation_context', None)
+            
+            # Determine which model to use based on operation context
+            if operation_context == "entity_extraction":
+                # Force gpt-4o-mini for entity extraction (fast, pattern recognition)
+                selected_model = "gpt-4o-mini"
+                is_reasoning_model = False
+            else:
+                # Use user-selected model for chat queries
+                selected_model = self.user_settings.get("rag", {}).get("llm_model", "gpt-5-mini")
+                is_reasoning_model = selected_model.startswith(('gpt-5', 'o1', 'o3', 'o4'))
+            
+            # Set dynamic timeout based on model type
+            # Reasoning models need longer timeout due to internal reasoning phase
+            timeout = 180.0 if is_reasoning_model else 30.0
+            
+            # Create client with dynamic timeout
+            client = AsyncOpenAI(api_key=self.api_key, timeout=timeout)
+            
             # Filter out LightRAG-specific parameters that OpenAI doesn't accept
             lightrag_internal_params = {
                 'hashing_kv',           # Used by LightRAG for caching
@@ -133,11 +153,25 @@ class RAGEngine:
                 'has_document_context', # Custom: Document context detection
             }
             
-            # Build valid OpenAI parameters
-            openai_kwargs = {
-                k: v for k, v in kwargs.items() 
-                if k not in lightrag_internal_params
+            # Parameters unsupported by reasoning models (GPT-5, o1, o3, o4)
+            reasoning_unsupported_params = {
+                'temperature', 'top_p', 'presence_penalty', 
+                'frequency_penalty', 'logprobs', 'top_logprobs', 'logit_bias'
             }
+            
+            # Build valid OpenAI parameters
+            if is_reasoning_model:
+                # Filter out both LightRAG-internal and reasoning-unsupported parameters
+                openai_kwargs = {
+                    k: v for k, v in kwargs.items() 
+                    if k not in lightrag_internal_params and k not in reasoning_unsupported_params
+                }
+            else:
+                # Standard models - only filter LightRAG-internal parameters
+                openai_kwargs = {
+                    k: v for k, v in kwargs.items() 
+                    if k not in lightrag_internal_params
+                }
             
             # Detect document context from instance variable (set before query)
             # or from kwargs (for direct calls)
@@ -163,25 +197,32 @@ class RAGEngine:
             
             messages.append({"role": "user", "content": prompt})
             
-            # Get model from settings or use default
-            model = self.user_settings.get("rag", {}).get("llm_model", "gpt-4o-mini")
+            # Build API call parameters
+            api_params = {
+                "model": selected_model,
+                "messages": messages,
+                **openai_kwargs
+            }
+            
+            # Use max_completion_tokens for all models (backward compatible)
+            # Replace max_tokens with max_completion_tokens if present
+            if 'max_tokens' in api_params:
+                api_params['max_completion_tokens'] = api_params.pop('max_tokens')
+            
+            # Add reasoning_effort for reasoning models (improves quality/speed balance)
+            if is_reasoning_model:
+                api_params['reasoning_effort'] = "medium"
             
             # Call OpenAI with filtered parameters
-            response = await client.chat.completions.create(
-                model=model,
-                messages=messages,
-                **openai_kwargs
-            )
+            response = await client.chat.completions.create(**api_params)
             
             return response.choices[0].message.content
         
         return llm_func
     
     def _create_streaming_llm_func(self):
-        """Create streaming LLM function for LightRAG"""
+        """Create streaming LLM function for LightRAG with GPT-5 reasoning model support"""
         from openai import AsyncOpenAI
-        
-        client = AsyncOpenAI(api_key=self.api_key)
         
         async def streaming_llm_func(
             prompt: str,
@@ -193,17 +234,53 @@ class RAGEngine:
             Generate streaming completion using OpenAI
             
             Note: Filters out LightRAG-internal parameters before calling OpenAI API
+            Supports GPT-5 reasoning models with dynamic timeout and parameter filtering
             """
+            # Detect operation context for model selection
+            operation_context = getattr(self, '_current_operation_context', None)
+            
+            # Determine which model to use based on operation context
+            if operation_context == "entity_extraction":
+                # Force gpt-4o-mini for entity extraction (fast, pattern recognition)
+                selected_model = "gpt-4o-mini"
+                is_reasoning_model = False
+            else:
+                # Use user-selected model for chat queries
+                selected_model = self.user_settings.get("rag", {}).get("llm_model", "gpt-5-mini")
+                is_reasoning_model = selected_model.startswith(('gpt-5', 'o1', 'o3', 'o4'))
+            
+            # Set dynamic timeout based on model type
+            # Reasoning models need longer timeout due to internal reasoning phase
+            timeout = 180.0 if is_reasoning_model else 30.0
+            
+            # Create client with dynamic timeout
+            client = AsyncOpenAI(api_key=self.api_key, timeout=timeout)
+            
             # Filter out LightRAG-specific parameters
             lightrag_internal_params = {
                 'hashing_kv', 'mode', 'use_model_func', 'llm_response_cache',
                 'keyword_extraction', 'return_context', 'streaming', 'has_document_context'
             }
             
-            openai_kwargs = {
-                k: v for k, v in kwargs.items() 
-                if k not in lightrag_internal_params
+            # Parameters unsupported by reasoning models (GPT-5, o1, o3, o4)
+            reasoning_unsupported_params = {
+                'temperature', 'top_p', 'presence_penalty', 
+                'frequency_penalty', 'logprobs', 'top_logprobs', 'logit_bias'
             }
+            
+            # Build valid OpenAI parameters
+            if is_reasoning_model:
+                # Filter out both LightRAG-internal and reasoning-unsupported parameters
+                openai_kwargs = {
+                    k: v for k, v in kwargs.items() 
+                    if k not in lightrag_internal_params and k not in reasoning_unsupported_params
+                }
+            else:
+                # Standard models - only filter LightRAG-internal parameters
+                openai_kwargs = {
+                    k: v for k, v in kwargs.items() 
+                    if k not in lightrag_internal_params
+                }
             
             # Detect document context
             has_document_context = kwargs.get('has_document_context',
@@ -223,16 +300,25 @@ class RAGEngine:
                 messages.extend(history_messages)
             messages.append({"role": "user", "content": prompt})
             
-            # Get model from settings
-            model = self.user_settings.get("rag", {}).get("llm_model", "gpt-4o-mini")
+            # Build API call parameters
+            api_params = {
+                "model": selected_model,
+                "messages": messages,
+                "stream": True,
+                **openai_kwargs
+            }
+            
+            # Use max_completion_tokens for all models (backward compatible)
+            # Replace max_tokens with max_completion_tokens if present
+            if 'max_tokens' in api_params:
+                api_params['max_completion_tokens'] = api_params.pop('max_tokens')
+            
+            # Add reasoning_effort for reasoning models (improves quality/speed balance)
+            if is_reasoning_model:
+                api_params['reasoning_effort'] = "medium"
             
             # Stream response
-            stream = await client.chat.completions.create(
-                model=model,
-                messages=messages,
-                stream=True,
-                **openai_kwargs
-            )
+            stream = await client.chat.completions.create(**api_params)
             
             async for chunk in stream:
                 if chunk.choices[0].delta.content:
@@ -412,6 +498,10 @@ class RAGEngine:
                 service="rag_engine"
             )
         
+        # Set operation context for entity extraction (use gpt-4o-mini)
+        self._current_operation_context = "entity_extraction"
+        self.logger.info("[MODEL] Using gpt-4o-mini for entity extraction")
+        
         try:
             self.logger.info(f"Inserting document into RAG ({len(text)} chars)")
             
@@ -493,6 +583,9 @@ class RAGEngine:
             import traceback
             self.logger.error(traceback.format_exc())
             raise
+        finally:
+            # Always reset operation context
+            self._current_operation_context = None
     
     async def query(
         self,
@@ -527,6 +620,11 @@ class RAGEngine:
                 "RAG engine not initialized",
                 service="rag_engine"
             )
+        
+        # Set operation context for chat query (use user-selected model)
+        self._current_operation_context = "chat_query"
+        user_model = self.user_settings.get("rag", {}).get("llm_model", "gpt-5-mini")
+        self.logger.info(f"[MODEL] Using {user_model} for chat query")
         
         try:
             # OPTIMIZED: Default top_k=20 for long documents
@@ -656,6 +754,9 @@ class RAGEngine:
                 "query": query,
                 "error": str(e)
             }
+        finally:
+            # Always reset operation context
+            self._current_operation_context = None
     
     async def query_stream(
         self,
@@ -687,6 +788,11 @@ class RAGEngine:
                 "RAG engine not initialized",
                 service="rag_engine"
             )
+        
+        # Set operation context for chat query (use user-selected model)
+        self._current_operation_context = "chat_query"
+        user_model = self.user_settings.get("rag", {}).get("llm_model", "gpt-5-mini")
+        self.logger.info(f"[MODEL] Using {user_model} for chat query (streaming)")
         
         try:
             # OPTIMIZED: Default top_k=20 for long documents
@@ -784,6 +890,9 @@ class RAGEngine:
             import traceback
             self.logger.error(traceback.format_exc())
             yield f"\n\nError: {str(e)}"
+        finally:
+            # Always reset operation context
+            self._current_operation_context = None
     
     async def _get_filtered_context(
         self,
@@ -1007,7 +1116,7 @@ class RAGEngine:
             self.use_reranking = rag_settings.get("use_reranking", True)
             
             # Store LLM model setting
-            self.llm_model = rag_settings.get("llm_model", "gpt-4o-mini")
+            self.llm_model = rag_settings.get("llm_model", "gpt-5-mini")
             
             # Apply language settings
             language_settings = settings.get("language", {})
@@ -1070,7 +1179,7 @@ class RAGEngine:
             "search_mode": getattr(self, 'search_mode', 'hybrid'),
             "top_k": getattr(self, 'top_k', 20),
             "use_reranking": getattr(self, 'use_reranking', True),
-            "llm_model": getattr(self, 'llm_model', 'gpt-4o-mini'),
+            "llm_model": getattr(self, 'llm_model', 'gpt-5-mini'),
             "preferred_language": getattr(self, 'preferred_language', 'en'),
             "agent_language": getattr(self, 'agent_language', 'auto')
         }
