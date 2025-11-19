@@ -1183,3 +1183,101 @@ class RAGEngine:
             "preferred_language": getattr(self, 'preferred_language', 'en'),
             "agent_language": getattr(self, 'agent_language', 'auto')
         }
+    
+    async def get_document_chunks(self, document_id: str) -> List[str]:
+        """
+        Get all chunks for a specific document
+        
+        Args:
+            document_id: User document ID (UUID)
+            
+        Returns:
+            List of chunk texts
+        """
+        try:
+            import json
+            from infrastructure.ai.document_chunk_mapper import DocumentChunkMapper
+            
+            # Map document ID to chunk IDs
+            mapper = DocumentChunkMapper(Path(self.working_dir))
+            chunk_ids, per_doc = mapper.map_documents_to_chunk_ids([document_id])
+            
+            if not chunk_ids:
+                self.logger.warning(f"No chunks found for document {document_id}")
+                return []
+            
+            # Load all chunks from storage
+            chunk_file = Path(self.working_dir) / "kv_store_text_chunks.json"
+            if not chunk_file.exists():
+                self.logger.error("LightRAG chunk file not found")
+                return []
+            
+            with open(chunk_file, 'r', encoding='utf-8') as f:
+                all_chunks = json.load(f)
+            
+            # Extract chunk texts
+            chunk_texts = []
+            for chunk_id in chunk_ids:
+                if chunk_id in all_chunks:
+                    chunk_data = all_chunks[chunk_id]
+                    content = chunk_data.get('content', '')
+                    if content:
+                        chunk_texts.append(content)
+            
+            self.logger.info(f"Retrieved {len(chunk_texts)} chunks for document {document_id}")
+            
+            return chunk_texts
+            
+        except Exception as e:
+            self.logger.error(f"Failed to get chunks for document {document_id}: {e}")
+            return []
+    
+    async def call_llm(self, prompt: str, system_prompt: Optional[str] = None) -> str:
+        """
+        Call LLM directly without RAG retrieval
+        
+        Args:
+            prompt: User prompt
+            system_prompt: Optional system prompt
+            
+        Returns:
+            LLM response text
+        """
+        from openai import AsyncOpenAI
+        
+        try:
+            # Get model from settings
+            selected_model = self.user_settings.get("rag", {}).get("llm_model", "gpt-4o-mini")
+            is_reasoning_model = selected_model.startswith(('gpt-5', 'o1', 'o3', 'o4'))
+            
+            # Set timeout based on model type
+            timeout = 180.0 if is_reasoning_model else 60.0
+            
+            # Create client
+            client = AsyncOpenAI(api_key=self.api_key, timeout=timeout)
+            
+            # Build messages
+            messages = []
+            if system_prompt:
+                messages.append({"role": "system", "content": system_prompt})
+            messages.append({"role": "user", "content": prompt})
+            
+            # Prepare API parameters
+            api_params = {
+                "model": selected_model,
+                "messages": messages,
+            }
+            
+            # Reasoning models don't support some parameters
+            if not is_reasoning_model:
+                api_params["temperature"] = 0.3
+                api_params["max_tokens"] = 4096
+            
+            # Call OpenAI
+            response = await client.chat.completions.create(**api_params)
+            
+            return response.choices[0].message.content or ""
+            
+        except Exception as e:
+            self.logger.error(f"Direct LLM call failed: {e}")
+            raise

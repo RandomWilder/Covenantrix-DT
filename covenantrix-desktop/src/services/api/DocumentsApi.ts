@@ -10,7 +10,10 @@ import {
   DocumentDeleteResponse,
   DocumentEntitiesResponse,
   BatchProgressEvent,
-  ResetStorageResponse
+  ResetStorageResponse,
+  DocumentSummary,
+  SummaryProgressUpdate,
+  TranslateSummaryRequest
 } from '../../types/document'
 import { isRetryableError, getRetryDelay, logError } from '../../utils/errorHandling'
 
@@ -317,6 +320,186 @@ export class DocumentsApi extends ApiService {
       logError(error as Error, 'resetStorage')
       console.error('Failed to reset storage:', error)
       throw new Error(`Failed to reset storage: ${(error as Error).message}`)
+    }
+  }
+
+  /**
+   * Generate summary for a document (non-streaming)
+   * POST /documents/{documentId}/summarize
+   */
+  async generateSummary(documentId: string): Promise<DocumentSummary> {
+    try {
+      return await this.retryWithBackoff(async () => {
+        const response = await this.post<DocumentSummary>(`/documents/${documentId}/summarize`, {
+          document_id: documentId
+        })
+        return response.data
+      }, 3, 2000)
+    } catch (error) {
+      logError(error as Error, 'generateSummary')
+      console.error('Failed to generate summary:', error)
+      throw new Error(`Failed to generate summary: ${(error as Error).message}`)
+    }
+  }
+
+  /**
+   * Generate summary with streaming progress updates (SSE)
+   * POST /documents/{documentId}/summarize/stream
+   */
+  async generateSummaryStream(
+    documentId: string,
+    onProgress: (update: SummaryProgressUpdate) => void
+  ): Promise<DocumentSummary> {
+    return new Promise(async (resolve, reject) => {
+      try {
+        const response = await fetch(
+          `http://localhost:8000/documents/${documentId}/summarize/stream`,
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Accept': 'text/event-stream',
+            },
+            body: JSON.stringify({
+              document_id: documentId
+            })
+          }
+        )
+
+        if (!response.ok) {
+          const errorText = await response.text()
+          const error = new Error(`Failed to start summary generation: ${response.statusText}. ${errorText}`)
+          logError(error, 'generateSummaryStream')
+          reject(error)
+          return
+        }
+
+        const reader = response.body?.getReader()
+        if (!reader) {
+          const error = new Error('No response body available')
+          logError(error, 'generateSummaryStream')
+          reject(error)
+          return
+        }
+
+        const decoder = new TextDecoder()
+        let buffer = ''
+
+        try {
+          while (true) {
+            const { done, value } = await reader.read()
+            
+            if (done) break
+
+            buffer += decoder.decode(value, { stream: true })
+            
+            // Process complete SSE messages (ending with \n\n)
+            const lines = buffer.split('\n\n')
+            buffer = lines.pop() || '' // Keep incomplete message in buffer
+
+            for (const line of lines) {
+              if (line.trim().startsWith('data: ')) {
+                const data = line.trim().substring(6) // Remove 'data: ' prefix
+                try {
+                  const parsed = JSON.parse(data)
+                  
+                  // Check for completion event
+                  if (parsed.type === 'complete' && parsed.summary) {
+                    resolve(parsed.summary as DocumentSummary)
+                    return
+                  }
+
+                  // Check for error event
+                  if (parsed.type === 'error') {
+                    const error = new Error(parsed.error || 'Summary generation failed')
+                    logError(error, 'generateSummaryStream')
+                    reject(error)
+                    return
+                  }
+
+                  // Progress update
+                  if (parsed.document_id) {
+                    onProgress(parsed as SummaryProgressUpdate)
+                  }
+                  
+                } catch (parseError) {
+                  console.error('Failed to parse SSE data:', data, parseError)
+                  logError(parseError as Error, 'parseSSEData')
+                }
+              }
+            }
+          }
+        } finally {
+          reader.releaseLock()
+        }
+        
+      } catch (error) {
+        logError(error as Error, 'generateSummaryStream')
+        reject(error)
+      }
+    })
+  }
+
+  /**
+   * Get existing summary for a document
+   * GET /documents/{documentId}/summary?language=en
+   */
+  async getSummary(documentId: string, language?: string): Promise<DocumentSummary> {
+    try {
+      return await this.retryWithBackoff(async () => {
+        const url = language 
+          ? `/documents/${documentId}/summary?language=${language}`
+          : `/documents/${documentId}/summary`
+        const response = await this.get<DocumentSummary>(url)
+        return response.data
+      }, 3, 1000)
+    } catch (error) {
+      logError(error as Error, 'getSummary')
+      console.error('Failed to get summary:', error)
+      throw new Error(`Failed to get summary: ${(error as Error).message}`)
+    }
+  }
+
+  /**
+   * Delete summary and all translations for a document
+   * DELETE /documents/{documentId}/summary
+   */
+  async deleteSummary(documentId: string): Promise<void> {
+    try {
+      return await this.retryWithBackoff(async () => {
+        await this.delete(`/documents/${documentId}/summary`)
+      }, 3, 1000)
+    } catch (error) {
+      logError(error as Error, 'deleteSummary')
+      console.error('Failed to delete summary:', error)
+      throw new Error(`Failed to delete summary: ${(error as Error).message}`)
+    }
+  }
+
+  /**
+   * Translate existing summary to target language
+   * POST /documents/{documentId}/summary/translate
+   * Body: { target_language: "English" | "אנגלית" | "Español" | ... }
+   */
+  async translateSummary(
+    documentId: string, 
+    targetLanguage: string
+  ): Promise<DocumentSummary> {
+    try {
+      return await this.retryWithBackoff(async () => {
+        const request: TranslateSummaryRequest = {
+          target_language: targetLanguage
+        }
+        const response = await this.post<DocumentSummary>(
+          `/documents/${documentId}/summary/translate`,
+          request
+        )
+        return response.data
+      }, 3, 2000)
+    } catch (error) {
+      logError(error as Error, 'translateSummary')
+      console.error('Failed to translate summary:', error)
+      throw new Error(`Failed to translate summary: ${(error as Error).message}`)
     }
   }
 }

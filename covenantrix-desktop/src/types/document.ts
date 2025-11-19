@@ -323,3 +323,43 @@ export enum DocumentType {
     document_name: string;
     entity_summary: EntitySummary;
   }
+
+  // ===== DOCUMENT SUMMARY TYPES =====
+
+  export interface SummaryMetadata {
+    document_id: string
+    document_name: string
+    total_chunks: number
+    batches_processed: number
+    generation_time_seconds: number
+    structure_detected: boolean
+    language: string
+    created_at: string
+    model_used: string
+  }
+
+  export interface DocumentSummary {
+    summary_id: string
+    document_id: string
+    document_name: string
+    language: string
+    summary_text: string
+    structure_detected: boolean
+    total_chunks: number
+    generation_time_seconds: number
+    created_at: string
+    available_translations: string[]
+  }
+
+  export interface SummaryProgressUpdate {
+    document_id: string
+    stage: 'initializing' | 'batch_processing' | 'section_merging' | 'finalizing' | 'completed' | 'failed'
+    progress_percent: number
+    current_batch?: number
+    total_batches?: number
+    message: string
+  }
+
+  export interface TranslateSummaryRequest {
+    target_language: string
+  }

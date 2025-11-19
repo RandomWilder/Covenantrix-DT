@@ -790,3 +790,120 @@ class DocumentService:
         except Exception as e:
             logger.error(f"Failed to extract entities for document {document_id}: {e}")
             raise DocumentProcessingError(f"Entity extraction failed: {e}")
+    
+    async def generate_summary(
+        self,
+        document_id: str,
+        progress_callback: Optional[Callable] = None
+    ):
+        """
+        Generate or retrieve cached summary for a document
+        
+        Args:
+            document_id: Document to summarize
+            progress_callback: Optional callback for progress updates
+            
+        Returns:
+            DocumentSummary
+        """
+        from infrastructure.storage.summary_storage import SummaryStorage
+        from domain.documents.summarization_service import SummarizationService
+        
+        # Get or create summary storage
+        summary_storage = SummaryStorage()
+        
+        # Create LLM function wrapper
+        async def llm_func(prompt: str) -> str:
+            """Wrapper for direct LLM calls without RAG retrieval"""
+            return await self.rag_engine.call_llm(prompt=prompt)
+        
+        # Create summarization service
+        summarization_service = SummarizationService(
+            llm_func=llm_func,
+            rag_engine=self.rag_engine,
+            summary_storage=summary_storage
+        )
+        
+        return await summarization_service.generate_summary(
+            document_id=document_id,
+            progress_callback=progress_callback
+        )
+    
+    async def get_summary(
+        self,
+        document_id: str,
+        language: Optional[str] = None
+    ):
+        """
+        Get existing summary for a document
+        
+        Args:
+            document_id: Document identifier
+            language: Optional language code
+            
+        Returns:
+            DocumentSummary or None
+        """
+        from infrastructure.storage.summary_storage import SummaryStorage
+        
+        summary_storage = SummaryStorage()
+        return await summary_storage.get_summary(
+            document_id=document_id,
+            language=language
+        )
+    
+    async def delete_summary(self, document_id: str) -> bool:
+        """
+        Delete summary and all translations for a document
+        
+        Args:
+            document_id: Document identifier
+            
+        Returns:
+            True if deleted successfully
+        """
+        from infrastructure.storage.summary_storage import SummaryStorage
+        
+        summary_storage = SummaryStorage()
+        return await summary_storage.delete_summary(document_id=document_id)
+    
+    async def translate_summary(
+        self,
+        document_id: str,
+        user_language_input: str,
+        progress_callback: Optional[Callable] = None
+    ) -> str:
+        """
+        Translate summary to target language
+        
+        Args:
+            document_id: Document identifier
+            user_language_input: User's free-text language input
+            progress_callback: Optional progress callback
+            
+        Returns:
+            Translated summary text
+        """
+        from infrastructure.storage.summary_storage import SummaryStorage
+        from domain.documents.summarization_service import SummarizationService
+        
+        # Get or create summary storage
+        summary_storage = SummaryStorage()
+        
+        # Create LLM function wrapper
+        async def llm_func(prompt: str) -> str:
+            """Wrapper for direct LLM calls without RAG retrieval"""
+            return await self.rag_engine.call_llm(prompt=prompt)
+        
+        # Create summarization service
+        summarization_service = SummarizationService(
+            llm_func=llm_func,
+            rag_engine=self.rag_engine,
+            summary_storage=summary_storage
+        )
+        
+        return await summarization_service.translate_summary(
+            document_id=document_id,
+            user_language_input=user_language_input,
+            progress_callback=progress_callback
+        )

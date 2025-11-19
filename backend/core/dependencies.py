@@ -44,6 +44,8 @@ _user_settings_storage: Optional[UserSettingsStorage] = None
 _oauth_service: Optional[GoogleOAuthService] = None
 _notification_storage: Optional[NotificationStorage] = None
 _subscription_service: Optional['SubscriptionService'] = None
+_summary_storage: Optional['SummaryStorage'] = None
+_summarization_service: Optional['SummarizationService'] = None
 
 
 def set_rag_engine(rag_engine: Optional[RAGEngine]) -> None:
@@ -492,3 +494,42 @@ def get_subscription_aware_document_service(
         max_file_size_mb=max_file_size_mb,
         ocr_service=ocr_service
     )
+
+
+def get_summary_storage(
+    settings: Settings = Depends(get_config)
+) -> 'SummaryStorage':
+    """Get summary storage instance (singleton)"""
+    global _summary_storage
+    if _summary_storage is None:
+        from infrastructure.storage.summary_storage import SummaryStorage
+        _summary_storage = SummaryStorage()
+    return _summary_storage
+
+
+def get_summarization_service(
+    rag_engine: RAGEngine = Depends(get_rag_engine),
+    summary_storage: 'SummaryStorage' = Depends(get_summary_storage)
+) -> 'SummarizationService':
+    """Get summarization service instance (singleton)"""
+    global _summarization_service
+    if _summarization_service is None:
+        from domain.documents.summarization_service import SummarizationService
+        
+        # Create LLM function wrapper
+        async def llm_func(prompt: str) -> str:
+            """Wrapper for LLM calls"""
+            result = await rag_engine.query(
+                query=prompt,
+                mode="naive",
+                only_need_context=False
+            )
+            return result.get("response", "")
+        
+        _summarization_service = SummarizationService(
+            llm_func=llm_func,
+            rag_engine=rag_engine,
+            summary_storage=summary_storage
+        )
+    
+    return _summarization_service

@@ -4,9 +4,13 @@
  */
 
 import React, { useState, useEffect } from 'react'
+import { FileText, CheckCircle, AlertCircle } from 'lucide-react'
 import { DocumentInfo, DocumentEntitiesResponse } from '../../types/document'
 import { DocumentsApi } from '../../services/api/DocumentsApi'
 import EntitySummary from './EntitySummary'
+import SummaryProgressBar from './SummaryProgressBar'
+import SummaryViewModal from './SummaryViewModal'
+import { useSummaryGeneration } from '../../hooks/useSummaryGeneration'
 import { formatDate } from '../../utils/dateUtils'
 
 interface DocumentCardProps {
@@ -24,8 +28,21 @@ const DocumentCard: React.FC<DocumentCardProps> = ({
   const [loadingEntities, setLoadingEntities] = useState(false)
   const [showEntities, setShowEntities] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [showSummaryModal, setShowSummaryModal] = useState(false)
 
   const documentsApi = new DocumentsApi()
+  
+  // Use summary generation hook
+  const {
+    summary,
+    isGenerating,
+    hasCompleted,
+    progress,
+    error: summaryError,
+    startGeneration,
+    deleteSummary,
+    translateSummary
+  } = useSummaryGeneration(document.document_id)
 
   useEffect(() => {
     console.log(`DocumentCard mounted for: ${document.document_id} (${document.filename})`)
@@ -66,6 +83,37 @@ const DocumentCard: React.FC<DocumentCardProps> = ({
   }
 
 
+
+  const handleGenerateSummary = async () => {
+    try {
+      await startGeneration()
+    } catch (err) {
+      console.error('Failed to generate summary:', err)
+    }
+  }
+
+  const handleViewSummary = () => {
+    if (summary) {
+      setShowSummaryModal(true)
+    }
+  }
+
+  const handleTranslateSummary = async (targetLanguage: string) => {
+    try {
+      await translateSummary(targetLanguage)
+    } catch (err) {
+      console.error('Failed to translate summary:', err)
+    }
+  }
+
+  const handleDeleteSummary = async () => {
+    try {
+      await deleteSummary()
+      setShowSummaryModal(false)
+    } catch (err) {
+      console.error('Failed to delete summary:', err)
+    }
+  }
 
   const getDocumentTypeColor = (type: string) => {
     const colors: Record<string, string> = {
@@ -131,6 +179,49 @@ const DocumentCard: React.FC<DocumentCardProps> = ({
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
               </svg>
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Summary Section */}
+      <div className="border-t border-gray-200 dark:border-gray-700">
+        <div className="px-4 py-3">
+          {isGenerating && progress ? (
+            // Generating: Show progress bar
+            <SummaryProgressBar
+              progress={progress.progress}
+              stage={progress.stage}
+              message={progress.message}
+              currentBatch={progress.currentBatch}
+              totalBatches={progress.totalBatches}
+            />
+          ) : summaryError ? (
+            // Error: Show retry button
+            <button
+              onClick={handleGenerateSummary}
+              className="w-full inline-flex items-center justify-center px-4 py-2 text-sm font-medium text-red-700 dark:text-red-300 bg-red-50 dark:bg-red-900/30 rounded-lg hover:bg-red-100 dark:hover:bg-red-900/50 transition-colors"
+            >
+              <AlertCircle className="w-4 h-4 mr-2" />
+              Retry Summary
+            </button>
+          ) : hasCompleted && summary ? (
+            // Completed: Show view button
+            <button
+              onClick={handleViewSummary}
+              className="w-full inline-flex items-center justify-center px-4 py-2 text-sm font-medium text-green-700 dark:text-green-300 bg-green-50 dark:bg-green-900/30 rounded-lg hover:bg-green-100 dark:hover:bg-green-900/50 transition-colors"
+            >
+              <CheckCircle className="w-4 h-4 mr-2" />
+              View Summary
+            </button>
+          ) : (
+            // No summary: Show generate button
+            <button
+              onClick={handleGenerateSummary}
+              className="w-full inline-flex items-center justify-center px-4 py-2 text-sm font-medium text-indigo-700 dark:text-indigo-300 bg-indigo-50 dark:bg-indigo-900/30 rounded-lg hover:bg-indigo-100 dark:hover:bg-indigo-900/50 transition-colors"
+            >
+              <FileText className="w-4 h-4 mr-2" />
+              Summarize
             </button>
           )}
         </div>
@@ -219,6 +310,17 @@ const DocumentCard: React.FC<DocumentCardProps> = ({
           </div>
         )}
       </div>
+
+      {/* Summary View Modal */}
+      {summary && (
+        <SummaryViewModal
+          isOpen={showSummaryModal}
+          onClose={() => setShowSummaryModal(false)}
+          summary={summary}
+          onTranslate={handleTranslateSummary}
+          onDelete={handleDeleteSummary}
+        />
+      )}
     </div>
   )
 }

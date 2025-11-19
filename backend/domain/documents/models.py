@@ -206,3 +206,30 @@ class QueryResult:
             "processing_time": self.processing_time_seconds,
             "timestamp": self.timestamp.isoformat()
         }
+
+
+@dataclass
+class SummaryMetadata:
+    """Summary generation metadata"""
+    document_id: str
+    document_name: str
+    total_chunks: int
+    batches_processed: int
+    generation_time_seconds: float
+    structure_detected: bool
+    language: str  # ISO 639-1 code (e.g., 'he', 'en')
+    created_at: datetime
+    model_used: str
+
+
+@dataclass
+class DocumentSummary:
+    """Document summary with translations"""
+    summary_id: str  # UUID
+    document_id: str
+    original_language: str  # ISO 639-1
+    original_summary: str
+    metadata: SummaryMetadata
+    translations: Dict[str, str]  # language_code -> translated_summary
+    created_at: datetime
+    updated_at: datetime

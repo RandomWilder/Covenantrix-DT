@@ -22,7 +22,9 @@ from api.schemas.documents import (
     DocumentResponse, DocumentListResponse, DocumentUploadResponse,
     BatchUploadResponse, BatchUploadItem, GoogleDriveFileRequest,
     GoogleDriveListResponse, GoogleDriveFileInfo, DocumentEntitiesResponse,
-    DocumentProgressStage, DocumentProgressEvent, BatchProgressEvent
+    DocumentProgressStage, DocumentProgressEvent, BatchProgressEvent,
+    GenerateSummaryRequest, TranslateSummaryRequest, SummaryResponse,
+    SummaryProgressUpdate
 )
 
 router = APIRouter(prefix="/documents", tags=["documents"])
@@ -953,4 +955,305 @@ async def get_document_entities(
         
     except Exception as e:
         logger.error(f"Failed to get document entities for {document_id}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# Summary Routes
+
+@router.post("/{document_id}/summarize", response_model=SummaryResponse)
+async def generate_document_summary(
+    document_id: str,
+    service: DocumentService = Depends(get_document_service)
+) -> SummaryResponse:
+    """
+    Generate summary for a document
+    Returns cached summary if exists, otherwise generates new one
+    
+    Args:
+        document_id: Document to summarize
+        service: Document service
+        
+    Returns:
+        Summary response
+    """
+    try:
+        # Generate or retrieve summary
+        summary = await service.generate_summary(document_id)
+        
+        return SummaryResponse(
+            summary_id=summary.summary_id,
+            document_id=summary.document_id,
+            document_name=summary.metadata.document_name,
+            language=summary.original_language,
+            summary_text=summary.original_summary,
+            structure_detected=summary.metadata.structure_detected,
+            total_chunks=summary.metadata.total_chunks,
+            generation_time_seconds=summary.metadata.generation_time_seconds,
+            created_at=summary.created_at.isoformat(),
+            available_translations=list(summary.translations.keys())
+        )
+        
+    except Exception as e:
+        logger.error(f"Failed to generate summary for {document_id}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/{document_id}/summarize/stream")
+async def generate_document_summary_stream(
+    document_id: str,
+    service: DocumentService = Depends(get_document_service)
+):
+    """
+    Generate summary with SSE progress updates
+    
+    Args:
+        document_id: Document to summarize
+        service: Document service
+        
+    Returns:
+        Server-Sent Events stream with progress updates
+    """
+    # Create a queue for progress updates
+    progress_queue = asyncio.Queue()
+    
+    async def generate_progress_stream():
+        """Generate SSE stream with progress updates"""
+        try:
+            # Start summary generation in background task
+            async def run_generation():
+                """Run summary generation with progress tracking"""
+                try:
+                    # Progress callback to put updates in queue
+                    async def progress_callback(update: dict):
+                        """Forward progress updates to queue"""
+                        await progress_queue.put(("progress", update))
+                    
+                    # Generate summary with progress tracking
+                    summary = await service.generate_summary(
+                        document_id=document_id,
+                        progress_callback=progress_callback
+                    )
+                    
+                    # Put final summary in queue
+                    await progress_queue.put(("complete", summary))
+                    
+                except Exception as e:
+                    logger.error(f"Summary generation failed for {document_id}: {e}")
+                    await progress_queue.put(("error", str(e)))
+            
+            # Start generation task
+            generation_task = asyncio.create_task(run_generation())
+            
+            # Stream progress updates
+            while True:
+                try:
+                    # Wait for next update with timeout
+                    event_type, data = await asyncio.wait_for(progress_queue.get(), timeout=1.0)
+                    
+                    if event_type == "progress":
+                        progress_event = SummaryProgressUpdate(**data)
+                        yield f"data: {progress_event.model_dump_json()}\n\n"
+                    
+                    elif event_type == "complete":
+                        summary = data
+                        final_response = SummaryResponse(
+                            summary_id=summary.summary_id,
+                            document_id=summary.document_id,
+                            document_name=summary.metadata.document_name,
+                            language=summary.original_language,
+                            summary_text=summary.original_summary,
+                            structure_detected=summary.metadata.structure_detected,
+                            total_chunks=summary.metadata.total_chunks,
+                            generation_time_seconds=summary.metadata.generation_time_seconds,
+                            created_at=summary.created_at.isoformat(),
+                            available_translations=list(summary.translations.keys())
+                        )
+                        yield f"data: {json.dumps({'type': 'complete', 'summary': final_response.model_dump()})}\n\n"
+                        break
+                    
+                    elif event_type == "error":
+                        error_event = {
+                            "type": "error",
+                            "error": data
+                        }
+                        yield f"data: {json.dumps(error_event)}\n\n"
+                        break
+                
+                except asyncio.TimeoutError:
+                    # Send keepalive
+                    yield ": keepalive\n\n"
+                    
+                    # Check if generation task is done
+                    if generation_task.done():
+                        # Check for unhandled exceptions
+                        try:
+                            generation_task.result()
+                        except Exception as e:
+                            logger.error(f"Generation task failed: {e}")
+                            error_event = {
+                                "type": "error",
+                                "error": str(e)
+                            }
+                            yield f"data: {json.dumps(error_event)}\n\n"
+                        break
+            
+        except Exception as e:
+            logger.error(f"Streaming summary generation failed for {document_id}: {e}")
+            error_event = {
+                "type": "error",
+                "error": str(e)
+            }
+            yield f"data: {json.dumps(error_event)}\n\n"
+    
+    return StreamingResponse(
+        generate_progress_stream(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no"
+        }
+    )
+
+
+@router.get("/{document_id}/summary", response_model=SummaryResponse)
+async def get_document_summary(
+    document_id: str,
+    language: Optional[str] = None,
+    service: DocumentService = Depends(get_document_service)
+) -> SummaryResponse:
+    """
+    Get existing summary for a document
+    
+    Args:
+        document_id: Document identifier
+        language: Optional language code
+        service: Document service
+        
+    Returns:
+        Summary response
+    """
+    try:
+        # Get summary
+        summary = await service.get_summary(document_id, language)
+        
+        if not summary:
+            raise HTTPException(
+                status_code=404,
+                detail=f"No summary found for document {document_id}"
+            )
+        
+        # If specific language requested, return translation
+        summary_text = summary.original_summary
+        if language and language in summary.translations:
+            summary_text = summary.translations[language]
+        
+        return SummaryResponse(
+            summary_id=summary.summary_id,
+            document_id=summary.document_id,
+            document_name=summary.metadata.document_name,
+            language=language or summary.original_language,
+            summary_text=summary_text,
+            structure_detected=summary.metadata.structure_detected,
+            total_chunks=summary.metadata.total_chunks,
+            generation_time_seconds=summary.metadata.generation_time_seconds,
+            created_at=summary.created_at.isoformat(),
+            available_translations=list(summary.translations.keys())
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to get summary for {document_id}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.delete("/{document_id}/summary")
+async def delete_document_summary(
+    document_id: str,
+    service: DocumentService = Depends(get_document_service)
+):
+    """
+    Delete summary and all translations for a document
+    
+    Args:
+        document_id: Document identifier
+        service: Document service
+        
+    Returns:
+        Deletion confirmation
+    """
+    try:
+        success = await service.delete_summary(document_id)
+        
+        if not success:
+            raise HTTPException(
+                status_code=404,
+                detail=f"No summary found for document {document_id}"
+            )
+        
+        return {
+            "success": True,
+            "document_id": document_id,
+            "message": "Summary deleted successfully"
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to delete summary for {document_id}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/{document_id}/summary/translate", response_model=SummaryResponse)
+async def translate_document_summary(
+    document_id: str,
+    request: TranslateSummaryRequest,
+    service: DocumentService = Depends(get_document_service)
+) -> SummaryResponse:
+    """
+    Translate existing summary to target language
+    Uses language detection from user's free-text input
+    
+    Args:
+        document_id: Document identifier
+        request: Translation request
+        service: Document service
+        
+    Returns:
+        Summary response with translation
+    """
+    try:
+        # Translate summary
+        translated_text = await service.translate_summary(
+            document_id=document_id,
+            user_language_input=request.target_language
+        )
+        
+        # Get updated summary with translation
+        summary = await service.get_summary(document_id)
+        
+        if not summary:
+            raise HTTPException(
+                status_code=404,
+                detail=f"No summary found for document {document_id}"
+            )
+        
+        return SummaryResponse(
+            summary_id=summary.summary_id,
+            document_id=summary.document_id,
+            document_name=summary.metadata.document_name,
+            language=request.target_language,
+            summary_text=translated_text,
+            structure_detected=summary.metadata.structure_detected,
+            total_chunks=summary.metadata.total_chunks,
+            generation_time_seconds=summary.metadata.generation_time_seconds,
+            created_at=summary.created_at.isoformat(),
+            available_translations=list(summary.translations.keys())
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to translate summary for {document_id}: {e}")
         raise HTTPException(status_code=500, detail=str(e))

@@ -146,3 +146,39 @@ class BatchProgressEvent(BaseModel):
     current_file_index: int
     file_progress: DocumentProgressEvent
     overall_progress_percent: int = Field(ge=0, le=100)
+
+
+# Summary Schemas
+
+class GenerateSummaryRequest(BaseModel):
+    """Summary generation request"""
+    document_id: str = Field(..., description="Document to summarize")
+
+
+class TranslateSummaryRequest(BaseModel):
+    """Summary translation request"""
+    target_language: str = Field(..., description="User's language input (free text, e.g., 'English', 'אנגלית', 'Español')")
+
+
+class SummaryResponse(BaseModel):
+    """Summary response"""
+    summary_id: str
+    document_id: str
+    document_name: str
+    language: str
+    summary_text: str
+    structure_detected: bool
+    total_chunks: int
+    generation_time_seconds: float
+    created_at: str
+    available_translations: List[str]  # language codes
+
+
+class SummaryProgressUpdate(BaseModel):
+    """Progress update during generation"""
+    document_id: str
+    stage: str  # 'initializing', 'batch_processing', 'section_merging', 'finalizing', 'completed', 'failed'
+    progress_percent: int = Field(ge=0, le=100)
+    current_batch: Optional[int] = None
+    total_batches: Optional[int] = None
+    message: str
